@@ -26,3 +26,5 @@ swap: Free space → Create a new partition → 4 GB → Primary → Beginning �
 , sdb оставляем свобпдным и не тронутым.
 
 продолжаем установку дебиан.
+miniaml host set-up:
+ssh && standard system utilities
