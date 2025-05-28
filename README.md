@@ -612,3 +612,136 @@ apt update
 apt install sudo
 usermod -aG sudo ksudzilo
 Then log out and back in as your regular user and you’ll be able to prefix commands with sudo again. But there’s nothing wrong with just working as root for the host setup steps—you only need a non‐root user when you get into your LFS chroot later.
+
+
+1) Make sure an SSH server is installed and running in the VM
+By default the minimal installer (with only “standard system utilities”) does not pull in an SSH server. Inside your Debian host VM, run:
+
+bash
+Copy
+Edit
+sudo apt update
+sudo apt install openssh-server
+sudo systemctl enable --now ssh
+You can verify it’s listening with:
+
+bash
+Copy
+Edit
+ss -tln | grep :22
+You should see a line like LISTEN 0 128 0.0.0.0:22.
+
+
+2) Connect to the right IP (no port-forwarding needed in bridged mode)
+Since you’ve got “Bridged” networking, your VM behaves like any other machine on your LAN. Find its address with:
+
+bash
+Copy
+Edit
+ip addr show
+Look for the inet entry under eth0 (or enp0s3, etc.) – for example 192.168.1.42/24. Then from Windows PowerShell simply:
+
+powershell
+Copy
+Edit
+ssh ksudzilo@192.168.1.42
+
+На выводе ip addr show вы видите две сетевые «карты»:
+
+lo
+
+Это «loopback» — виртуальный интерфейс «само-себе» (localhost).
+
+Всегда имеет адрес 127.0.0.1.
+
+Используется только для общения процессов внутри одной машины.
+
+Для внешнего SSH-доступа не годится.
+
+enp0s3
+
+Это ваша реальная виртуальная сетевая карта, привязанная к мосту (bridged).
+
+Она получила адрес 192.168.10.34/24 (пример).
+
+Именно этот IP вы будете использовать, чтобы подключаться по SSH из Windows:
+
+powershell
+Copy
+Edit
+ssh ksudzilo@192.168.10.34
+Если вам нужен IPv6, можно взять inet6 fe80::… с тем же интерфейсом, но обычно хватает IPv4.
+
+Как использовать
+Проверьте, что SSH-демон слушает на 0.0.0.0:22
+
+bash
+Copy
+Edit
+ss -tln | grep :22
+Должно быть что-то вроде:
+
+nginx
+Copy
+Edit
+LISTEN 0 128 0.0.0.0:22 0.0.0.0:*
+Из Windows (в PowerShell или любой другой SSH-клиент):
+
+powershell
+Copy
+Edit
+ssh ksudzilo@<IP_вашей_VM>
+где <IP_вашей_VM> — это адрес из строки inet у enp0s3 (в вашем случае 192.168.10.34).
+
+Если вы оставили сеть в режиме NAT, а не Bridge,
+— нужно настроить «Port Forwarding» в свойствах VM (NAT → Advanced → Port Forwarding) и перенаправить, скажем, хост-порт 2222 → гость-порт 22.
+— Тогда в Windows:
+
+powershell
+Copy
+Edit
+ssh ksudzilo@127.0.0.1 -p 2222
+running script from the manual
+https://www.linuxfromscratch.org/lfs/view/systemd/chapter02/hostreqs.html
+
+check to be ok, if not install missing tools
+
+su –            # или sudo -i, если sudo уже настроен
+apt update
+apt install \
+  binutils \
+  bison \
+  gawk \
+  build-essential \
+  m4 \
+  patch \
+  texinfo
+
+
+
+.......
+
+Убедитесь, что у вас есть настоящий бинарник /bin/bash (он есть по умолчанию).
+
+Замените /bin/sh символической ссылкой на bash:
+
+bash
+Copy
+Edit
+sudo rm -f /bin/sh
+sudo ln -sv /bin/bash /bin/sh
+После этого все скрипты, которые запускаются через #!/bin/sh, будут исполняться bash-ом вместо dash. Debian поддерживает такую замену (и сам предлагает её в dpkg-reconfigure dash), сломать систему этим вы вряд ли сможете.
+
+— Единственное «но», что скрипты, рассчитанные строго на POSIX-bash (а не dash), могут чуть-чуть подтормаживать, но функционально всё будет ровно так же работать.
+
+После замены /bin/sh не забудьте вновь запустить ./version-check.sh — теперь он должен выдать только OK:.
+
+Да, это всё — у вас теперь:
+
+Чистый хост-Debian на /dev/sda с нужными инструментами и правильными симлинками.
+
+Второй пустой диск /dev/sdb готовый под LFS.
+
+Снэпшот состояния виртуалки, чтобы можно было откатиться. 
+
+..................................................................................................................................
