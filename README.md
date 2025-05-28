@@ -596,4 +596,19 @@ https://github.com/rbourgeat/ft_linux/blob/main/ft_linux_others.sh
 https://github.com/zanninso/42-correction-files/blob/master/ft_linux.pdf
 https://github.com/phillipjacobs/ft_linux
 
+https://www.linuxfromscratch.org/lfs/view/systemd/chapter02/hostreqs.html
 
+https://habr.com/ru/companies/ruvds/articles/702570/
+
+executing command as root, ok cause
+cause you didn’t install sudo (the minimal host install only gave you the basics), you have to su to root and run package commands as root. That’s perfectly fine.
+
+If you’d rather use sudo, you can install and configure it as root:
+
+bash
+Copy
+Edit
+apt update
+apt install sudo
+usermod -aG sudo ksudzilo
+Then log out and back in as your regular user and you’ll be able to prefix commands with sudo again. But there’s nothing wrong with just working as root for the host setup steps—you only need a non‐root user when you get into your LFS chroot later.
