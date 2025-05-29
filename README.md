@@ -1364,6 +1364,8 @@ sdb5	/	✅ ext4	Основной root LFS
 
 
 
+https://www.geeksforgeeks.org/linux-directory-structure/
+
 
 
 
