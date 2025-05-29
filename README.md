@@ -31,6 +31,20 @@ ssh && standard system utilities.
 sey yes to grub
 https://www.linuxfromscratch.org/lfs/view/stable/chapter02/hostreqs.html
 
+
+https://www.linuxfromscratch.org/lfs/view/systemd/chapter02/stages.html
+chapter 1-4: su - (as root), set lfs env for root shell session
+
+export LFS=/mnt/lfs
+echo $LFS   # outputs /mnt/lfs
+
+***
+netstat -aon | findstr :4646
+sudo systemctl restart ssh
+ssudo ss -tulnp | grep :22
+
+
+
 ft_linux_basic.sh
 
 #!/bin/sh
@@ -745,3 +759,10 @@ sudo ln -sv /bin/bash /bin/sh
 Снэпшот состояния виртуалки, чтобы можно было откатиться. 
 
 ..................................................................................................................................
+
+
+
+
+
+
+
