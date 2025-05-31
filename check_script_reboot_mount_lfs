@@ -1,0 +1,51 @@
+#!/bin/bash
+
+# 1. Устанавливаем переменную окружения LFS
+export LFS=/mnt/lfs
+
+# 2. Проверяем и монтируем основной раздел (корень LFS)
+if ! mountpoint -q $LFS; then
+  echo "→ Монтируем корневой раздел LFS (/dev/sdb5)..."
+  mount -v -t ext4 /dev/sdb5 $LFS || { echo "❌ Ошибка монтирования /dev/sdb5"; exit 1; }
+else
+  echo "✅ /dev/sdb5 уже смонтирован в $LFS"
+fi
+
+# 3. Проверяем и монтируем boot-раздел
+if [ ! -d $LFS/boot ]; then
+  echo "→ Создаём директорию $LFS/boot"
+  mkdir -pv $LFS/boot
+fi
+
+if ! mountpoint -q $LFS/boot; then
+  echo "→ Монтируем boot-раздел (/dev/sdb2)..."
+  mount -v -t ext4 /dev/sdb2 $LFS/boot || { echo "❌ Ошибка монтирования /dev/sdb2"; exit 1; }
+else
+  echo "✅ /dev/sdb2 уже смонтирован в $LFS/boot"
+fi
+
+# 4. Проверяем swap
+if swapon --show | grep -q '/dev/sdb3'; then
+  echo "✅ Swap /dev/sdb3 уже активен"
+else
+  echo "→ Активируем swap /dev/sdb3"
+  swapon /dev/sdb3 || { echo "❌ Не удалось активировать swap /dev/sdb3"; exit 1; }
+fi
+
+# 5. Устанавливаем umask (если нужно)
+echo "→ Устанавливаем umask 022"
+umask 022
+
+# 6. Проверка
+echo
+echo "=== Проверка: ==="
+echo "→ \$LFS = $LFS"
+echo "→ Точки монтирования:"
+mount | grep sdb
+echo "→ Swap:"
+swapon --show
+echo "→ umask:"
+umask
+
+echo
+echo "✅ Всё готово для продолжения сборки LFS"
