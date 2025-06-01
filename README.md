@@ -4702,6 +4702,4449 @@ $LFS/tools/bin/$LFS_TGT-g++ -print-file-name=libstdc++.so
 Когда захочешь продолжить — возвращайся и начинай с того шага, на котором остановилась.
 https://www.linuxfromscratch.org/lfs/view/systemd/chapter06/introduction.html
 
+Что происходит на этом этапе:
+Кросс-компиляция временных инструментов
+
+Ты собираешь минимальный набор утилит (компилятор, базовые утилиты, оболочка и т.д.), которые нужны для сборки “чистого” LFS.
+
+Всё компилируется с помощью уже собранного кросс-компилятора (который сам был собран в предыдущих главах).
+
+Инсталляция инструментов
+
+Все собранные в этой главе утилиты и библиотеки устанавливаются в твой LFS-директорию (например, /mnt/lfs), а не в основную систему.
+
+Эти утилиты и библиотеки пока не могут быть использованы напрямую — до момента входа в chroot (следующая глава).
+
+Зависимость от хоста
+
+Ты всё ещё зависишь от программ на хостовой системе, потому что твой временный набор инструментов пока не полон.
+
+После перехода в chroot (глава 7) LFS будет использовать только свои собранные программы, но пока этого не произошло.
+
+Что важно знать и соблюдать:
+Работать только под пользователем lfs
+
+Никогда не делать этот этап под root!
+
+Если ошибёшься и будешь собирать что-то как root или не с теми переменными среды — можешь повредить основную систему.
+
+Тщательно следить за окружением
+
+Все переменные окружения (например, LFS, PATH и др.) должны быть настроены как в разделе 4.4.
+
+Это обеспечивает, что всё будет устанавливаться в правильное место, и не “загрязнит” систему.
+
+Не пропускать и не менять команды
+
+Каждая команда и последовательность действий имеют смысл (например, очистка build-папок, настройка переменных, установка прав).
+
+Даже если что-то кажется лишним — делай по книге.
+
+Результаты этого этапа
+
+В /mnt/lfs/tools (или в другой твоей LFS-директории) появится рабочий минимальный набор инструментов для будущей сборки внутри chroot.
+
+Пока их нельзя использовать напрямую — всё ещё работаешь из-под хоста.
+
+После этой главы
+
+Ты будешь готов войти в chroot — “виртуальное окружение”, где LFS будет использовать только что собранные инструменты, а не ничего из хоста.
+
+Итого, что нужно знать на этом этапе:
+Что такое cross-compiling и зачем это: чтобы изолировать свою LFS-сборку от зависимостей хоста.
+
+Какую роль играет временный набор утилит: это “минимальная система” только для сборки окончательной системы.
+
+Всё делать от имени пользователя lfs и с правильными переменными окружения.
+
+Понимать, что после этого этапа ты пока не независим — переход в независимое окружение будет после chroot.
+
+Если коротко:
+
+На этом этапе ты создаёшь временные инструменты для сборки LFS, строго по инструкции, под пользователем lfs и с правильным окружением. Пока что всё ещё используешь некоторые инструменты хоста, но скоро (после chroot) LFS станет полностью самостоятельной средой.
+
+Если нужны примеры команд, пояснения по кросс-компиляции или настройке окружения — дай знать, помогу с любым конкретным шагом!
+
+
+
+
+
+
+
+
+
+Tools
+
+
+
+Вот как проверить, что окружение lfs подготовлено правильно и ты можешь безопасно начинать сборку временных инструментов (глава 6):
+
+1. Проверка переменных окружения
+Перейди в терминал под пользователем lfs и выполни:
+
+bash
+Copy
+Edit
+env | grep -E 'LFS|LC_ALL|LFS_TGT|PATH|CONFIG_SITE|MAKEFLAGS'
+У тебя должны быть следующие переменные:
+
+LFS=/mnt/lfs (или твой путь)
+
+LC_ALL=POSIX
+
+LFS_TGT=...-lfs-linux-gnu (пример: x86_64-lfs-linux-gnu)
+
+PATH — первым должен идти $LFS/tools/bin, потом /usr/bin и, возможно, /bin
+
+CONFIG_SITE=$LFS/usr/share/config.site
+
+MAKEFLAGS=-j(число_ядер) если добавлял параллельную сборку
+
+Если чего-то нет — пересмотри свой .bashrc и .bash_profile, и снова выполни source ~/.bash_profile.
+
+2. Проверка активной оболочки (bash)
+Убедись, что ты действительно работаешь под новой чистой оболочкой. Проверь:
+
+bash
+Copy
+Edit
+echo $SHELL
+Должен быть /bin/bash.
+
+3. Проверка пользователя
+Проверь, что ты точно под пользователем lfs:
+
+bash
+Copy
+Edit
+whoami
+4. Проверка пути до tools
+Убедись, что $LFS/tools и $LFS/sources существуют и имеют владельца lfs:
+
+bash
+Copy
+Edit
+ls -ld $LFS/tools $LFS/sources
+Оба должны принадлежать пользователю lfs (в столбце пользователя).
+
+5. Проверка состояния /etc/bash.bashrc
+Проверь, что этот файл отсутствует или переименован:
+
+bash
+Copy
+Edit
+ls -l /etc/bash.bashrc*
+Если есть файл bash.bashrc.NOUSE — всё нормально.
+
+6. Проверка переменной PATH
+Посмотри, что первым в PATH стоит твой $LFS/tools/bin:
+
+bash
+Copy
+Edit
+echo $PATH
+Он должен выглядеть примерно так:
+
+bash
+Copy
+Edit
+/mnt/lfs/tools/bin:/usr/bin:/bin
+(путь может отличаться, если твой $LFS другой)
+
+7. Проверка MAKEFLAGS
+Если добавил строку про MAKEFLAGS, проверь:
+
+bash
+Copy
+Edit
+echo $MAKEFLAGS
+Должно быть, например: -j8 (если 8 ядер).
+
+8. Проверка "чистоты" окружения
+Убедись, что переменные типа LD_LIBRARY_PATH, CFLAGS, CPPFLAGS, и прочие специфические для хоста НЕ установлены:
+
+bash
+Copy
+Edit
+env | grep -E 'LD_LIBRARY_PATH|CFLAGS|CPPFLAGS'
+Вывод должен быть пустым.
+
+Если всё верно:
+Ты под пользователем lfs
+
+Все переменные окружения, указанные выше, выставлены
+
+/mnt/lfs/tools и /mnt/lfs/sources принадлежат пользователю lfs
+
+/etc/bash.bashrc убран (или переименован)
+
+PATH начинается с $LFS/tools/bin
+
+Нет подозрительных переменных окружения
+
+→ Всё готово для сборки временных инструментов.
+
+Если хочешь, можешь скинуть сюда вывод команд — я помогу проверить по пунктам!
+Если что-то не так, помогу поправить настройки.
+https://www.linuxfromscratch.org/lfs/view/systemd/chapter06/introduction.html
+
+Что ты делаешь на этом этапе
+Ты собираешь и устанавливаешь временную версию утилиты M4 (макро-процессор), которая позже понадобится для сборки других программ LFS.
+
+Важно:
+
+Всё делается от имени пользователя lfs.
+
+Работает только в окружении, где правильно выставлены переменные (как мы обсуждали выше).
+
+Используется кросс-компиляция: собирается не для системы-хоста, а для будущего LFS.
+
+Пошагово:
+1. Распакуй исходники
+Перейди в каталог с исходниками и распакуй архив:
+
+bash
+Copy
+Edit
+cd $LFS/sources
+tar xvf m4-1.4.20.tar.xz
+cd m4-1.4.20
+2. Настройка (configure)
+bash
+Copy
+Edit
+./configure --prefix=/usr \
+            --host=$LFS_TGT \
+            --build=$(build-aux/config.guess)
+Объяснение параметров:
+
+--prefix=/usr — устанавливать программу в /usr (но благодаря DESTDIR позже она окажется в $LFS).
+
+--host=$LFS_TGT — указывает, для какой платформы ты собираешь (например, x86_64-lfs-linux-gnu).
+
+--build=$(build-aux/config.guess) — указывает, на какой платформе сейчас идёт сборка (автоопределение).
+
+3. Сборка
+bash
+Copy
+Edit
+make
+Компилирует исходный код в бинарники.
+
+Если у тебя много ядер, можешь добавить -j$(nproc), но если в .bashrc уже есть MAKEFLAGS, просто make достаточно.
+
+4. Установка
+bash
+Copy
+Edit
+make DESTDIR=$LFS install
+DESTDIR=$LFS — временно указывает установить не в реальный /usr, а в поддиректорию $LFS, чтобы не затронуть хост.
+
+В результате, например, программа окажется в $LFS/usr/bin/m4.
+
+5. (Рекомендация) Очистка
+После установки лучше выйти из папки и удалить исходники, чтобы не захламлять $LFS/sources:
+
+bash
+Copy
+Edit
+cd $LFS/sources
+rm -rf m4-1.4.20
+Краткое резюме команд
+bash
+Copy
+Edit
+cd $LFS/sources
+tar xvf m4-1.4.20.tar.xz
+cd m4-1.4.20
+
+./configure --prefix=/usr \
+            --host=$LFS_TGT \
+            --build=$(build-aux/config.guess)
+make
+make DESTDIR=$LFS install
+
+cd $LFS/sources
+rm -rf m4-1.4.20
+Почему это важно
+Так ты добавляешь в будущую LFS свою версию M4, собранную “чисто” для своей системы, а не хостовую.
+
+Временные инструменты помещаются в $LFS, чтобы потом внутри chroot использовать только их.
+
+Если что-то не собирается — покажи ошибку, подскажу что делать!
+Если хочешь убедиться, что всё правильно установилось — спроси, расскажу, как проверить.
+
+
+
+
+
+
+
+
+M4 — это маленькая, но важная утилита в экосистеме Linux и Unix.
+
+Что такое M4?
+M4 — это макропроцессор, то есть программа для обработки текстовых файлов, которая заменяет определённые шаблоны (макросы) на их значения.
+
+Она похожа на “препроцессор” для C, но работает с любым текстом, не только с программами на C.
+
+Очень простая сама по себе, но полезная “внутренняя” часть сборочных систем.
+
+Зачем нужна M4 при сборке LFS?
+Автоматизация и генерация файлов:
+Многие программы используют автотулзы (autotools) — цепочку инструментов для автоматической генерации скриптов configure и makefile. В этой цепочке M4 используется для расширения макросов.
+
+GNU Autoconf:
+Скрипты configure часто создаются с помощью autoconf, который требует M4 для своей работы. Без M4 нельзя будет корректно собирать многие программы.
+
+Зависимость других пакетов:
+Даже если ты напрямую не вызываешь M4, он нужен для сборки автоконфигурируемых пакетов. Например, bash, coreutils, и т.д.
+
+Пример простого использования M4
+m4
+Copy
+Edit
+define(`FOO', `Hello, world!')
+FOO
+Если сохранить это как file.m4 и выполнить команду:
+
+bash
+Copy
+Edit
+m4 file.m4
+Ты получишь:
+
+Copy
+Edit
+Hello, world!
+Кратко
+M4 — “строительный кирпичик” для автосборки и автоконфигурации.
+
+Нужен для генерации файлов на этапе сборки и настройки других программ.
+
+Без него не собрать многие другие базовые пакеты.
+
+В LFS ставится в числе первых, чтобы весь процесс сборки шёл через твои, “чистые” инструменты, а не через версию с хоста.
+
+Если хочется ещё примеров использования или деталей — скажи!
+
+
+
+
+
+
+
+
+
+Tools
+
+
+
+ChatGPT can make mistakes. Check important inf
+M4 в современном мире обычно не используется напрямую обычными пользователями, но играет критическую роль "за кулисами" во многих инструментах сборки ПО и генерации скриптов. Вот самые важные области, где M4 действительно необходим:
+
+1. GNU Autotools (autoconf, automake, autoheader)
+autoconf — это инструмент для генерации скрипта configure, который автоматизирует настройку исходного кода программы под конкретную систему.
+
+autoconf сам написан так, что большинство его макросов — это на самом деле m4-макросы!
+
+Когда ты собираешь любой проект, использующий autotools (а это львиная доля GNU-софта: Bash, Coreutils, Vim, и сотни других), то реально сборка начинается с запуска m4 и подстановки его макросов.
+
+Пример:
+
+Ты видишь в исходниках файл configure.ac — autoconf запускает m4, чтобы по этому файлу сгенерировать скрипт configure.
+
+2. Генерация Makefile-ов
+M4 участвует в генерации различных Makefile-ов, подставляя правильные пути, опции, команды и т.п.
+
+Например, файл Makefile.in (шаблон) может проходить через m4 на этапе подготовки.
+
+3. Документация и шаблоны
+Иногда проекты используют m4 для генерации man-страниц, справок, README-файлов из шаблонов.
+
+4. Ядро Linux
+В некоторых частях исходников ядра Linux (особенно старых версий) также можно встретить m4-скрипты для генерации исходного кода.
+
+5. Cross-compiling (LFS, Embedded, Buildroot, Yocto и др.)
+Когда ты собираешь свою систему с нуля (LFS, Yocto, Buildroot), то почти наверняка захочешь собирать программы, использующие autotools, значит m4 обязателен.
+
+Без m4 скрипты configure и makefile не сгенерируются, а значит и ПО не собрать.
+
+6. Некоторые языки программирования и компиляторы
+M4 может использоваться в качестве препроцессора при сборке компиляторов и интерпретаторов.
+
+7. Другие инструменты и пакеты
+Некоторые утилиты используют m4 для собственных нужд (например, sendmail использует m4 для генерации своих конфигов).
+
+В LFS
+В LFS m4 нужен, чтобы уже на раннем этапе (глава 6) поддерживать работу autotools для сборки других пакетов, иначе ты не сможешь скомпилировать, например, Bash, Binutils, GCC и многие другие утилиты.
+
+Кратко
+M4 нужен всегда, когда в проекте используются autotools (autoconf, automake) или когда скрипты/конфиги генерируются из шаблонов с макросами.
+
+Это "инструмент для инструментов", его всегда требуют среды автоматизированной сборки софта, и без него большая часть Linux-проектов просто не соберётся.
+
+Если покажешь пример программы, которую хочешь собрать — я скажу, нужен там m4 или нет!
+Но для любой серьёзной системы (особенно как LFS) m4 — это must have.
+
+
+
+
+
+
+
+
+Давай разложу процесс сборки Ncurses на этапе временных инструментов LFS максимально понятно, по шагам и с пояснениями.
+
+Что такое Ncurses и зачем он нужен?
+Ncurses — это библиотека для работы с “текстовым интерфейсом” в терминале (например, цветной вывод, меню, навигация по стрелкам, текстовые интерфейсы типа Midnight Commander, top, nano, и т.д.).
+
+Очень многие утилиты Unix/Linux используют Ncurses, поэтому она критически важна в системе.
+
+Шаги по сборке и установке Ncurses (этап временных инструментов LFS):
+Всё выполняется от имени пользователя lfs в окружении с правильно выставленными переменными среды!
+
+1. Распакуй архив и перейди в каталог
+bash
+Copy
+Edit
+cd $LFS/sources
+tar xvf ncurses-6.5-20250517.tar.xz
+cd ncurses-6.5-20250517
+2. Построй вспомогательную программу tic на машине-хосте
+Эта программа нужна только на этапе установки базы терминалов, она должна работать именно на текущей системе (host):
+
+bash
+Copy
+Edit
+mkdir build
+pushd build
+  ../configure AWK=gawk
+  make -C include
+  make -C progs tic
+popd
+pushd/popd просто временно заходят в каталог и возвращают тебя назад.
+
+tic — терминальная утилита для компиляции базы данных терминалов.
+
+3. Подготовь Ncurses к сборке (configure)
+bash
+Copy
+Edit
+./configure --prefix=/usr                \
+            --host=$LFS_TGT              \
+            --build=$(./config.guess)    \
+            --mandir=/usr/share/man      \
+            --with-manpage-format=normal \
+            --with-shared                \
+            --without-normal             \
+            --with-cxx-shared            \
+            --without-debug              \
+            --without-ada                \
+            --disable-stripping          \
+            AWK=gawk
+Объяснения ключевых опций:
+--host=$LFS_TGT — кросс-компиляция для будущего LFS.
+
+--without-normal, --without-debug, --without-ada — сборка только нужного минимума, без лишних библиотек и поддержек.
+
+--disable-stripping — не использовать strip с хоста.
+
+AWK=gawk — явно просим использовать gawk, потому что mawk иногда ломает сборку.
+
+4. Компиляция (make)
+bash
+Copy
+Edit
+make
+5. Установка во временную систему (make install)
+bash
+Copy
+Edit
+make DESTDIR=$LFS TIC_PATH=$(pwd)/build/progs/tic install
+DESTDIR=$LFS — установка во временную директорию, не затрагивая хост.
+
+TIC_PATH=$(pwd)/build/progs/tic — указываем путь до только что собранного tic, который работает на хосте (чтобы сгенерировать базу терминалов).
+
+6. Создай символическую ссылку (для совместимости)
+bash
+Copy
+Edit
+ln -sv libncursesw.so $LFS/usr/lib/libncurses.so
+Некоторые пакеты требуют libncurses.so, а у нас есть только libncursesw.so (wide char версия), делаем ссылку.
+
+7. Исправь заголовочный файл curses.h
+bash
+Copy
+Edit
+sed -e 's/^#if.*XOPEN.*$/#if 1/' -i $LFS/usr/include/curses.h
+Эта команда всегда включает wide-char структуру данных, чтобы не возникало конфликтов между разными реализациями Ncurses.
+
+8. (Опционально) Очистка
+bash
+Copy
+Edit
+cd $LFS/sources
+rm -rf ncurses-6.5-20250517
+Кратко весь процесс:
+bash
+Copy
+Edit
+cd $LFS/sources
+tar xvf ncurses-6.5-20250517.tar.xz
+cd ncurses-6.5-20250517
+
+mkdir build
+pushd build
+  ../configure AWK=gawk
+  make -C include
+  make -C progs tic
+popd
+
+./configure --prefix=/usr                \
+            --host=$LFS_TGT              \
+            --build=$(./config.guess)    \
+            --mandir=/usr/share/man      \
+            --with-manpage-format=normal \
+            --with-shared                \
+            --without-normal             \
+            --with-cxx-shared            \
+            --without-debug              \
+            --without-ada                \
+            --disable-stripping          \
+            AWK=gawk
+
+make
+
+make DESTDIR=$LFS TIC_PATH=$(pwd)/build/progs/tic install
+
+ln -sv libncursesw.so $LFS/usr/lib/libncurses.so
+
+sed -e 's/^#if.*XOPEN.*$/#if 1/' -i $LFS/usr/include/curses.h
+
+cd $LFS/sources
+rm -rf ncurses-6.5-20250517
+Если будет ошибка или нужен разбор вывода/ошибки — кидай сюда, разберём вместе!
+Если хочется узнать, что именно делает каждая команда или где она критична — уточни, поясню глубже.
+
+
+
+
+
+
+
+Отлично, ты подошёл к сборке coreutils — это очень важный пакет (включает команды: ls, cp, mv, rm, cat, и многие другие базовые утилиты Unix/Linux).
+
+Всё делается по стандартной для LFS временных инструментов схеме. Вот подробно и по шагам:
+
+1. Распакуй исходники и перейди в каталог
+bash
+Copy
+Edit
+cd $LFS/sources
+tar xvf coreutils-9.7.tar.xz
+cd coreutils-9.7
+(если архив с другим расширением, подставь своё, например .tar.gz — смотри ls)
+
+2. Конфигурируй Coreutils для сборки
+bash
+Copy
+Edit
+./configure --prefix=/usr                     \
+            --host=$LFS_TGT                   \
+            --build=$(build-aux/config.guess) \
+            --enable-install-program=hostname \
+            --enable-no-install-program=kill,uptime
+Что делают параметры:
+
+--prefix=/usr — стандартный путь установки.
+
+--host, --build — кросс-компиляция.
+
+--enable-install-program=hostname — добавить команду hostname.
+
+--enable-no-install-program=kill,uptime — не собирать эти команды (они будут добавлены позже или не нужны сейчас).
+
+3. Сборка
+bash
+Copy
+Edit
+make
+4. Установка во временную систему
+bash
+Copy
+Edit
+make DESTDIR=$LFS install
+Это установит всё во временную директорию $LFS, а не в хостовую систему.
+
+5. Перемести программы и man-страницы на ожидаемые места
+bash
+Copy
+Edit
+mv -v $LFS/usr/bin/chroot              $LFS/usr/sbin
+mkdir -pv $LFS/usr/share/man/man8
+mv -v $LFS/usr/share/man/man1/chroot.1 $LFS/usr/share/man/man8/chroot.8
+sed -i 's/"1"/"8"/'                    $LFS/usr/share/man/man8/chroot.8
+Зачем: Некоторые программы (например, chroot) ожидаются в определённых местах, и некоторые пакеты позже будут искать их именно там.
+
+man1 → man8: Страницы справки chroot должны быть в разделе 8 (админские команды), а не в 1.
+
+6. (Опционально) Очистка
+bash
+Copy
+Edit
+cd $LFS/sources
+rm -rf coreutils-9.7
+Весь процесс для Coreutils-9.7 (чек-лист):
+bash
+Copy
+Edit
+cd $LFS/sources
+tar xvf coreutils-9.7.tar.xz
+cd coreutils-9.7
+
+./configure --prefix=/usr                     \
+            --host=$LFS_TGT                   \
+            --build=$(build-aux/config.guess) \
+            --enable-install-program=hostname \
+            --enable-no-install-program=kill,uptime
+
+make
+make DESTDIR=$LFS install
+
+mv -v $LFS/usr/bin/chroot              $LFS/usr/sbin
+mkdir -pv $LFS/usr/share/man/man8
+mv -v $LFS/usr/share/man/man1/chroot.1 $LFS/usr/share/man/man8/chroot.8
+sed -i 's/"1"/"8"/'                    $LFS/usr/share/man/man8/chroot.8
+
+cd $LFS/sources
+rm -rf coreutils-9.7
+Пояснения:
+Всё делай под пользователем lfs, с правильными переменными среды.
+
+Не пропускай шаг с перемещением chroot — это важно для совместимости будущих этапов сборки LFS.
+
+Если будет ошибка на любом этапе — присылай сюда, поможем быстро разобраться!
+
+Двигайся дальше, а если что-то не получится — не стесняйся, сразу пиши!
+
+
+
+
+
+
+Отлично, переходим к diffutils — это пакет, который добавляет такие важные команды, как diff, cmp, sdiff, diff3 (они сравнивают файлы и каталоги).
+
+Давай быстро и чётко — шаги и зачем всё это делается:
+
+1. Распакуй исходники и перейди в каталог
+bash
+Copy
+Edit
+cd $LFS/sources
+tar xvf diffutils-3.12.tar.xz
+cd diffutils-3.12
+(Если архив другой — смотри через ls и меняй команду на свой вариант)
+
+2. Конфигурируй пакет
+bash
+Copy
+Edit
+./configure --prefix=/usr   \
+            --host=$LFS_TGT \
+            gl_cv_func_strcasecmp_works=y \
+            --build=$(./build-aux/config.guess)
+Что важно:
+
+gl_cv_func_strcasecmp_works=y — это “обход” для проверки функции strcasecmp, которая есть в glibc (у тебя точно всё будет работать). Без этого конфигурирование упадёт из-за невозможности проверить функцию на чужой архитектуре.
+
+3. Сборка
+bash
+Copy
+Edit
+make
+4. Установка во временную систему
+bash
+Copy
+Edit
+make DESTDIR=$LFS install
+5. Очистка (опционально)
+bash
+Copy
+Edit
+cd $LFS/sources
+rm -rf diffutils-3.12
+Весь процесс для Diffutils-3.12 (чек-лист):
+bash
+Copy
+Edit
+cd $LFS/sources
+tar xvf diffutils-3.12.tar.xz
+cd diffutils-3.12
+
+./configure --prefix=/usr   \
+            --host=$LFS_TGT \
+            gl_cv_func_strcasecmp_works=y \
+            --build=$(./build-aux/config.guess)
+
+make
+make DESTDIR=$LFS install
+
+cd $LFS/sources
+rm -rf diffutils-3.12
+Пояснения:
+Всё делается под пользователем lfs с правильным окружением.
+
+Переменная gl_cv_func_strcasecmp_works=y нужна только из-за нюансов кросс-компиляции, и для glibc-2.41 и выше — это всегда безопасно.
+
+Если увидишь ошибку — кидай сюда, разберём на месте.
+
+Двигайся дальше! Если нужна краткая справка или подробности по тому, как и зачем использовать diffutils — спрашивай!
+
+
+
+
+
+
+
+
+
+Tools
+
+
+
+ChatGPT can make mistakes. Check im
+Переходим к пакету File — он добавляет команду file, которая определяет тип любого файла по его содержимому (например, текстовый, ELF, архив, картинка и т.д.).
+
+Здесь сборка проходит в два этапа — сначала собирается временный file для запуска на хосте (host), затем пакет компилируется для LFS.
+Вот подробные шаги:
+
+1. Распакуй исходники и перейди в каталог
+bash
+Copy
+Edit
+cd $LFS/sources
+tar xvf file-5.46.tar.gz   # или .tar.xz, если у тебя другой архив
+cd file-5.46
+2. Собери временную версию file для хоста (host)
+bash
+Copy
+Edit
+mkdir build
+pushd build
+  ../configure --disable-bzlib      \
+               --disable-libseccomp \
+               --disable-xzlib      \
+               --disable-zlib
+  make
+popd
+Зачем это?
+Чтобы создать базу сигнатур файлов (magic), нужен file, который запускается на текущем компьютере, а не только на будущем LFS.
+
+3. Конфигурируй пакет для сборки под LFS
+bash
+Copy
+Edit
+./configure --prefix=/usr --host=$LFS_TGT --build=$(./config.guess)
+4. Сборка (используя только что собранный file)
+bash
+Copy
+Edit
+make FILE_COMPILE=$(pwd)/build/src/file
+Параметр FILE_COMPILE указывает использовать временный file, собранный для host.
+
+5. Установка
+bash
+Copy
+Edit
+make DESTDIR=$LFS install
+6. Удаление libtool archive
+bash
+Copy
+Edit
+rm -v $LFS/usr/lib/libmagic.la
+Это .la файл не нужен и может мешать кросс-компиляции в будущем.
+
+7. Очистка (опционально)
+bash
+Copy
+Edit
+cd $LFS/sources
+rm -rf file-5.46
+Весь процесс для File-5.46 (шпаргалка):
+bash
+Copy
+Edit
+cd $LFS/sources
+tar xvf file-5.46.tar.gz    # или tar.xz
+cd file-5.46
+
+mkdir build
+pushd build
+  ../configure --disable-bzlib      \
+               --disable-libseccomp \
+               --disable-xzlib      \
+               --disable-zlib
+  make
+popd
+
+./configure --prefix=/usr --host=$LFS_TGT --build=$(./config.guess)
+make FILE_COMPILE=$(pwd)/build/src/file
+make DESTDIR=$LFS install
+rm -v $LFS/usr/lib/libmagic.la
+
+cd $LFS/sources
+rm -rf file-5.46
+Пояснения:
+Всё делается под пользователем lfs, с правильными переменными среды.
+
+Временная сборка file нужна только для корректного создания базы сигнатур.
+
+Не забудь удалить файл libmagic.la — это важно!
+
+Если будет ошибка или что-то не так с путями — сразу скинь сюда, посмотрим вместе!
+Двигайся дальше!
+
+
+
+
+
+
+
+Теперь идёт сборка findutils — это пакет, который даёт команды find, xargs, locate, updatedb и др.
+Эти инструменты нужны для поиска файлов, запуска команд над результатами поиска и поддержания базы данных для ускоренного поиска.
+
+Шаги по сборке Findutils (по LFS):
+1. Распакуй исходники и перейди в каталог
+bash
+Copy
+Edit
+cd $LFS/sources
+tar xvf findutils-4.10.0.tar.xz
+cd findutils-4.10.0
+(Используй своё расширение — если архив другой, замени команду.)
+
+2. Конфигурируй пакет
+bash
+Copy
+Edit
+./configure --prefix=/usr                   \
+            --localstatedir=/var/lib/locate \
+            --host=$LFS_TGT                 \
+            --build=$(build-aux/config.guess)
+--localstatedir=/var/lib/locate — чтобы база данных locate хранилась в привычном для Linux месте.
+
+Остальные параметры знакомы (стандартные для кросс-компиляции).
+
+3. Сборка
+bash
+Copy
+Edit
+make
+4. Установка во временную систему
+bash
+Copy
+Edit
+make DESTDIR=$LFS install
+5. Очистка исходников (опционально)
+bash
+Copy
+Edit
+cd $LFS/sources
+rm -rf findutils-4.10.0
+Весь процесс для Findutils-4.10.0 (шпаргалка):
+bash
+Copy
+Edit
+cd $LFS/sources
+tar xvf findutils-4.10.0.tar.xz
+cd findutils-4.10.0
+
+./configure --prefix=/usr                   \
+            --localstatedir=/var/lib/locate \
+            --host=$LFS_TGT                 \
+            --build=$(build-aux/config.guess)
+
+make
+make DESTDIR=$LFS install
+
+cd $LFS/sources
+rm -rf findutils-4.10.0
+Пояснения:
+Всё выполняй под пользователем lfs и в правильном окружении.
+
+После установки у тебя появятся: find, xargs, locate, updatedb — это очень базовые и часто используемые команды для работы с файлами и автоматизацией.
+
+Если какая-то команда не проходит или выдаёт ошибку — копируй её сюда, разберём!
+
+Удачи! Пиши, если захочешь подробнее узнать, как пользоваться find/xargs/locate или возникнет ошибка!
+
+
+
+ереходим к gawk — это основной GNU awk, инструмент для обработки и анализа текстовых файлов (например, для парсинга логов, табличных данных и автоматизации текстовых преобразований). Он часто используется внутри многих скриптов и при сборке других пакетов.
+
+Шаги по сборке Gawk (по LFS):
+1. Распакуй исходники и перейди в каталог
+bash
+Copy
+Edit
+cd $LFS/sources
+tar xvf gawk-5.3.2.tar.xz
+cd gawk-5.3.2
+(если архив другого типа — подставь правильное расширение)
+
+2. Удали из Makefile установку лишних файлов
+bash
+Copy
+Edit
+sed -i 's/extras//' Makefile.in
+Эта команда удаляет из списка устанавливаемых файлов всё из каталога extras, чтобы не ставились ненужные утилиты (они не нужны для LFS и могут мешать).
+
+3. Конфигурируй gawk
+bash
+Copy
+Edit
+./configure --prefix=/usr   \
+            --host=$LFS_TGT \
+            --build=$(build-aux/config.guess)
+4. Сборка
+bash
+Copy
+Edit
+make
+5. Установка во временную систему
+bash
+Copy
+Edit
+make DESTDIR=$LFS install
+6. Очистка исходников (опционально)
+bash
+Copy
+Edit
+cd $LFS/sources
+rm -rf gawk-5.3.2
+Весь процесс для Gawk-5.3.2 (чек-лист):
+bash
+Copy
+Edit
+cd $LFS/sources
+tar xvf gawk-5.3.2.tar.xz
+cd gawk-5.3.2
+
+sed -i 's/extras//' Makefile.in
+
+./configure --prefix=/usr   \
+            --host=$LFS_TGT \
+            --build=$(build-aux/config.guess)
+
+make
+make DESTDIR=$LFS install
+
+cd $LFS/sources
+rm -rf gawk-5.3.2
+Пояснения:
+Всё делай под пользователем lfs с правильным окружением!
+
+sed-команда обязательна, чтобы не устанавливались лишние компоненты.
+
+Gawk понадобится на следующих шагах сборки LFS, и многие пакеты зависят от наличия этой утилиты для обработки текстовых данных.
+
+Если где-то будет ошибка — скинь её сюда, разберёмся.
+
+Если интересно — могу объяснить, как пользоваться awk/gawk для обработки текстовых файлов, просто напиши!
+
+
+
+
+
+
+
+
+
+Tools
+
+
+
+ChatGPT can make mistakes. Check 
+Пакет grep добавляет одноимённую команду для поиска текста в файлах, которую используют практически все Unix-скрипты и пользователи.
+
+Вот что делать:
+
+Шаги по сборке Grep (LFS):
+1. Распакуй исходники и перейди в каталог
+bash
+Copy
+Edit
+cd $LFS/sources
+tar xvf grep-3.12.tar.xz
+cd grep-3.12
+(замени расширение, если архив не .tar.xz)
+
+2. Конфигурируй grep
+bash
+Copy
+Edit
+./configure --prefix=/usr   \
+            --host=$LFS_TGT \
+            --build=$(./build-aux/config.guess)
+3. Сборка
+bash
+Copy
+Edit
+make
+4. Установка во временную систему
+bash
+Copy
+Edit
+make DESTDIR=$LFS install
+5. Очистка исходников (опционально)
+bash
+Copy
+Edit
+cd $LFS/sources
+rm -rf grep-3.12
+Весь процесс для Grep-3.12 (чек-лист):
+bash
+Copy
+Edit
+cd $LFS/sources
+tar xvf grep-3.12.tar.xz
+cd grep-3.12
+
+./configure --prefix=/usr   \
+            --host=$LFS_TGT \
+            --build=$(./build-aux/config.guess)
+
+make
+make DESTDIR=$LFS install
+
+cd $LFS/sources
+rm -rf grep-3.12
+Если появится ошибка — сразу кидай сюда текст!
+Если всё идёт без проблем — двигайся к следующему пакету.
+
+Если интересно, почему grep важен, или как его использовать для поиска в текстах, — спрашивай, расскажу с примерами!
+
+
+
+
+
+
+
+
+
+Tools
+
+
+
+ChatGPT can make mistakes. Check import
+Теперь переходим к gzip — это стандартная утилита для сжатия и распаковки файлов в Linux (gzip, gunzip, zcat). Она критически важна для работы с архивами и логами.
+
+Вот все шаги:
+
+1. Распакуй исходники и перейди в каталог
+bash
+Copy
+Edit
+cd $LFS/sources
+tar xvf gzip-1.14.tar.xz
+cd gzip-1.14
+(если у тебя другой архив — поменяй расширение)
+
+2. Конфигурируй пакет
+bash
+Copy
+Edit
+./configure --prefix=/usr --host=$LFS_TGT
+3. Сборка
+bash
+Copy
+Edit
+make
+4. Установка во временную систему
+bash
+Copy
+Edit
+make DESTDIR=$LFS install
+5. Очистка исходников (опционально)
+bash
+Copy
+Edit
+cd $LFS/sources
+rm -rf gzip-1.14
+Весь процесс для Gzip-1.14 (шпаргалка):
+bash
+Copy
+Edit
+cd $LFS/sources
+tar xvf gzip-1.14.tar.xz
+cd gzip-1.14
+
+./configure --prefix=/usr --host=$LFS_TGT
+make
+make DESTDIR=$LFS install
+
+cd $LFS/sources
+rm -rf gzip-1.14
+Пояснения:
+
+Всё делается под пользователем lfs с нужными переменными среды.
+
+После этого в $LFS/usr/bin появятся утилиты: gzip, gunzip, zcat и т.д.
+
+Эти программы будут доступны в твоей будущей LFS-системе и нужны для работы с архивами на следующих этапах.
+
+Если что-то не пойдёт — скопируй ошибку сюда!
+Если интересно, как работают ключи или внутренности gzip — могу рассказать на практике.
+
+
+
+
+
+
+
+
+
+Tools
+
+
+
+make — это программа для автоматизации сборки (управляет процессом компиляции и установкой других программ, по инструкциям из Makefile).
+Без неё невозможна автоматическая сборка большинства Linux-пакетов.
+
+Вот краткая и полная инструкция:
+
+1. Распакуй исходники и перейди в каталог
+bash
+Copy
+Edit
+cd $LFS/sources
+tar xvf make-4.4.1.tar.gz     # или .tar.xz, если твой архив другой
+cd make-4.4.1
+2. Конфигурируй make
+bash
+Copy
+Edit
+./configure --prefix=/usr   \
+            --host=$LFS_TGT \
+            --build=$(build-aux/config.guess)
+3. Сборка
+bash
+Copy
+Edit
+make
+4. Установка во временную систему
+bash
+Copy
+Edit
+make DESTDIR=$LFS install
+5. Очистка исходников (опционально)
+bash
+Copy
+Edit
+cd $LFS/sources
+rm -rf make-4.4.1
+Весь процесс для Make-4.4.1 (чек-лист):
+bash
+Copy
+Edit
+cd $LFS/sources
+tar xvf make-4.4.1.tar.gz
+cd make-4.4.1
+
+./configure --prefix=/usr   \
+            --host=$LFS_TGT \
+            --build=$(build-aux/config.guess)
+
+make
+make DESTDIR=$LFS install
+
+cd $LFS/sources
+rm -rf make-4.4.1
+Пояснения:
+
+Всё по-прежнему выполняется под пользователем lfs с правильными переменными среды.
+
+После этого в твоей будущей системе будет собственный make, независимый от версии на хосте.
+
+Он понадобится для сборки следующих пакетов.
+
+Если появится ошибка — кидай сюда. Если всё работает — переходи к следующему пакету!
+
+
+
+
+
+
+
+
+
+Tools
+
+
+
+
+Всё идёт по стандартной схеме — patch это утилита, которая применяется для “накатывания” изменений (*.patch и *.diff файлов) на исходный код, что очень часто используется в сборке Linux и приложений.
+
+1. Распакуй исходники и перейди в каталог
+bash
+Copy
+Edit
+cd $LFS/sources
+tar xvf patch-2.8.tar.gz    # или .tar.xz, если архив с другим расширением
+cd patch-2.8
+2. Конфигурируй пакет
+bash
+Copy
+Edit
+./configure --prefix=/usr   \
+            --host=$LFS_TGT \
+            --build=$(build-aux/config.guess)
+3. Сборка
+bash
+Copy
+Edit
+make
+4. Установка во временную систему
+bash
+Copy
+Edit
+make DESTDIR=$LFS install
+5. Очистка исходников (опционально)
+bash
+Copy
+Edit
+cd $LFS/sources
+rm -rf patch-2.8
+Весь процесс для Patch-2.8 (шпаргалка):
+bash
+Copy
+Edit
+cd $LFS/sources
+tar xvf patch-2.8.tar.gz
+cd patch-2.8
+
+./configure --prefix=/usr   \
+            --host=$LFS_TGT \
+            --build=$(build-aux/config.guess)
+
+make
+make DESTDIR=$LFS install
+
+cd $LFS/sources
+rm -rf patch-2.8
+Пояснения:
+
+Всё делается под пользователем lfs с нужными переменными среды.
+
+Patch будет нужен почти на всех последующих шагах для применения официальных или пользовательских патчей к другим программам.
+
+Если появится ошибка — сразу сюда, разберёмся!
+Если всё ок — вперёд к следующему пакету!
+
+
+
+
+
+
+
+
+
+Tools
+
+
+
+ChatGPT can make mistakes. Check important in
+Ты продвигаешься отлично!
+sed — это очень важная утилита, “потоковый редактор”, которая применяется для поиска и замены текста в файлах/потоках. Она используется практически во всех скриптах сборки и автоматизации.
+
+Вот как собрать и установить sed для LFS:
+
+1. Распакуй исходники и перейди в каталог
+bash
+Copy
+Edit
+cd $LFS/sources
+tar xvf sed-4.9.tar.xz
+cd sed-4.9
+(если архив у тебя не .tar.xz, подставь своё расширение)
+
+2. Конфигурируй пакет
+bash
+Copy
+Edit
+./configure --prefix=/usr   \
+            --host=$LFS_TGT \
+            --build=$(./build-aux/config.guess)
+3. Сборка
+bash
+Copy
+Edit
+make
+4. Установка во временную систему
+bash
+Copy
+Edit
+make DESTDIR=$LFS install
+5. Очистка исходников (опционально)
+bash
+Copy
+Edit
+cd $LFS/sources
+rm -rf sed-4.9
+Весь процесс для Sed-4.9 (чек-лист):
+bash
+Copy
+Edit
+cd $LFS/sources
+tar xvf sed-4.9.tar.xz
+cd sed-4.9
+
+./configure --prefix=/usr   \
+            --host=$LFS_TGT \
+            --build=$(./build-aux/config.guess)
+
+make
+make DESTDIR=$LFS install
+
+cd $LFS/sources
+rm -rf sed-4.9
+Пояснения:
+
+Всё делается под пользователем lfs, в нужном окружении.
+
+sed — основа для обработки текста при автоматизации и патчинге, без него невозможны многие сборочные процессы.
+
+Если появится ошибка — скинь её сюда, разберём.
+Если всё ок — можешь переходить к следующему пакету!
+
+
+
+
+
+
+
+
+
+Tools
+
+
+
+Всё стандартно! tar — это ключевая утилита для создания, извлечения и управления архивами (.tar, .tar.gz, .tar.xz и т.д.), используется повсеместно.
+
+Шаги для сборки Tar-1.35:
+1. Распакуй архив и перейди в каталог
+bash
+Copy
+Edit
+cd $LFS/sources
+tar xvf tar-1.35.tar.xz
+cd tar-1.35
+(если архив другого типа — подставь своё расширение)
+
+2. Конфигурируй пакет
+bash
+Copy
+Edit
+./configure --prefix=/usr   \
+            --host=$LFS_TGT \
+            --build=$(build-aux/config.guess)
+3. Сборка
+bash
+Copy
+Edit
+make
+4. Установка во временную систему
+bash
+Copy
+Edit
+make DESTDIR=$LFS install
+5. Очистка исходников (опционально)
+bash
+Copy
+Edit
+cd $LFS/sources
+rm -rf tar-1.35
+Весь процесс для Tar-1.35 (чек-лист):
+bash
+Copy
+Edit
+cd $LFS/sources
+tar xvf tar-1.35.tar.xz
+cd tar-1.35
+
+./configure --prefix=/usr   \
+            --host=$LFS_TGT \
+            --build=$(build-aux/config.guess)
+
+make
+make DESTDIR=$LFS install
+
+cd $LFS/sources
+rm -rf tar-1.35
+Пояснения:
+
+Всё делается от пользователя lfs и в нужном окружении.
+
+tar будет основным архиватором в твоём LFS — и для распаковки новых пакетов, и для автоматизации в будущем.
+
+Если появится ошибка — просто скинь сюда вывод, вместе решим!
+Готов переходить дальше!
+
+
+
+
+
+
+
+
+
+Tools
+
+
+
+ChatGPT can make mistakes. Check important info.
+Всё верно, теперь собираем xz — это современная и очень эффективная утилита для сжатия файлов в форматах xz и lzma (почти все современные исходники для LFS и многих дистрибутивов поставляются в .tar.xz). Эта программа необходима для работы с такими архивами!
+
+Шаги для сборки Xz-5.8.1:
+1. Распакуй архив и перейди в каталог
+bash
+Copy
+Edit
+cd $LFS/sources
+tar xvf xz-5.8.1.tar.xz
+cd xz-5.8.1
+2. Конфигурируй пакет
+bash
+Copy
+Edit
+./configure --prefix=/usr                     \
+            --host=$LFS_TGT                   \
+            --build=$(build-aux/config.guess) \
+            --disable-static                  \
+            --docdir=/usr/share/doc/xz-5.8.1
+--disable-static — не собирать статические библиотеки (экономит место, они не нужны).
+
+--docdir=/usr/share/doc/xz-5.8.1 — правильное расположение документации.
+
+3. Сборка
+bash
+Copy
+Edit
+make
+4. Установка во временную систему
+bash
+Copy
+Edit
+make DESTDIR=$LFS install
+5. Удалить libtool archive (важно!)
+bash
+Copy
+Edit
+rm -v $LFS/usr/lib/liblzma.la
+Этот файл не нужен и даже может мешать на следующих этапах кросс-компиляции.
+
+6. Очистка исходников (опционально)
+bash
+Copy
+Edit
+cd $LFS/sources
+rm -rf xz-5.8.1
+Весь процесс для Xz-5.8.1 (чек-лист):
+bash
+Copy
+Edit
+cd $LFS/sources
+tar xvf xz-5.8.1.tar.xz
+cd xz-5.8.1
+
+./configure --prefix=/usr                     \
+            --host=$LFS_TGT                   \
+            --build=$(build-aux/config.guess) \
+            --disable-static                  \
+            --docdir=/usr/share/doc/xz-5.8.1
+
+make
+make DESTDIR=$LFS install
+rm -v $LFS/usr/lib/liblzma.la
+
+cd $LFS/sources
+rm -rf xz-5.8.1
+Пояснения:
+
+Всё делается от имени пользователя lfs и с правильными переменными среды.
+
+Xz добавит команды xz, unxz, lzma и др. для работы с современными архивами.
+
+Если будет ошибка или вопросы по ключам/деталям — спрашивай!
+Если всё прошло успешно — переходи к следующему этапу.
+
+
+
+
+
+
+
+Конечно! Вот полный набор команд для сборки GCC Pass 2 (gcc-14.2.0 + зависимости) в твоём окружении LFS, с комментариями и адаптацией под твою версию. Просто копируй и по шагам выполняй:
+
+1. Распаковка исходников и подготовка зависимостей
+bash
+Copy
+Edit
+cd /mnt/lfs/sources
+
+# Распаковать исходники gcc
+tar xvf gcc-14.2.0.tar.xz
+cd gcc-14.2.0
+
+# Распаковать зависимости и переместить их в нужные каталоги
+tar -xf ../mpfr-4.2.2.tar.xz
+mv -v mpfr-4.2.2 mpfr
+
+tar -xf ../gmp-6.3.0.tar.xz
+mv -v gmp-6.3.0 gmp
+
+tar -xf ../mpc-1.3.1.tar.gz
+mv -v mpc-1.3.1 mpc
+2. Для x86_64: исправь lib64 на lib
+bash
+Copy
+Edit
+case $(uname -m) in
+  x86_64)
+    sed -e '/m64=/s/lib64/lib/' \
+        -i.orig gcc/config/i386/t-linux64
+  ;;
+esac
+3. Исправь Makefile для POSIX потоков
+bash
+Copy
+Edit
+sed '/thread_header =/s/@.*@/gthr-posix.h/' \
+    -i libgcc/Makefile.in libstdc++-v3/include/Makefile.in
+4. Создай отдельный build-каталог и зайди в него
+bash
+Copy
+Edit
+mkdir -v build
+cd build
+5. Сбрось переменные оптимизации (если они были заданы)
+bash
+Copy
+Edit
+unset CFLAGS CXXFLAGS LDFLAGS
+6. Конфигурируй сборку GCC
+bash
+Copy
+Edit
+../configure                   \
+    --build=$(../config.guess) \
+    --host=$LFS_TGT            \
+    --target=$LFS_TGT          \
+    --prefix=/usr              \
+    --with-build-sysroot=$LFS  \
+    --enable-default-pie       \
+    --enable-default-ssp       \
+    --disable-nls              \
+    --disable-multilib         \
+    --disable-libatomic        \
+    --disable-libgomp          \
+    --disable-libquadmath      \
+    --disable-libsanitizer     \
+    --disable-libssp           \
+    --disable-libvtv           \
+    --enable-languages=c,c++   \
+    LDFLAGS_FOR_TARGET=-L$PWD/$LFS_TGT/libgcc
+7. Сборка GCC (может занять долго!)
+bash
+Copy
+Edit
+make
+8. Установка во временную систему
+bash
+Copy
+Edit
+make DESTDIR=$LFS install
+9. Создай ссылку cc → gcc
+bash
+Copy
+Edit
+ln -sv gcc $LFS/usr/bin/cc
+10. (Опционально) Очистка исходников
+bash
+Copy
+Edit
+cd /mnt/lfs/sources
+rm -rf gcc-14.2.0
+Весь процесс — как скрипт:
+bash
+Copy
+Edit
+cd /mnt/lfs/sources
+tar xvf gcc-14.2.0.tar.xz
+cd gcc-14.2.0
+
+tar -xf ../mpfr-4.2.2.tar.xz
+mv -v mpfr-4.2.2 mpfr
+
+tar -xf ../gmp-6.3.0.tar.xz
+mv -v gmp-6.3.0 gmp
+
+tar -xf ../mpc-1.3.1.tar.gz
+mv -v mpc-1.3.1 mpc
+
+case $(uname -m) in
+  x86_64)
+    sed -e '/m64=/s/lib64/lib/' \
+        -i.orig gcc/config/i386/t-linux64
+  ;;
+esac
+
+sed '/thread_header =/s/@.*@/gthr-posix.h/' \
+    -i libgcc/Makefile.in libstdc++-v3/include/Makefile.in
+
+mkdir -v build
+cd build
+
+unset CFLAGS CXXFLAGS LDFLAGS
+
+../configure                   \
+    --build=$(../config.guess) \
+    --host=$LFS_TGT            \
+    --target=$LFS_TGT          \
+    --prefix=/usr              \
+    --with-build-sysroot=$LFS  \
+    --enable-default-pie       \
+    --enable-default-ssp       \
+    --disable-nls              \
+    --disable-multilib         \
+    --disable-libatomic        \
+    --disable-libgomp          \
+    --disable-libquadmath      \
+    --disable-libsanitizer     \
+    --disable-libssp           \
+    --disable-libvtv           \
+    --enable-languages=c,c++   \
+    LDFLAGS_FOR_TARGET=-L$PWD/$LFS_TGT/libgcc
+
+make
+make DESTDIR=$LFS install
+
+ln -sv gcc $LFS/usr/bin/cc
+
+cd /mnt/lfs/sources
+rm -rf gcc-14.2.0
+Если что-то не пойдёт (ошибка, зависание, вопросы по ресурсам) — сразу пиши сюда, помогу с разбором и оптимизацией!
+Желаю удачи, это действительно важный этап!
+https://www.linuxfromscratch.org/lfs/view/systemd/chapter07/introduction.html
+
+Поясню простыми словами, что начинается с этой главы и почему это важно:
+
+Что происходит на этом этапе
+Ты завершил сборку всех временных инструментов (toolchain): теперь у тебя есть свои bash, gcc, make, coreutils и т.д., которые не зависят от хост-системы.
+
+Пришло время построить “настоящую” систему:
+Всё, что дальше ты будешь собирать, будет работать уже не на инструментах хоста, а на своих, “чистых” LFS-инструментах.
+
+Что такое chroot и зачем он нужен?
+chroot — это специальная команда, которая меняет "корень файловой системы" для текущей сессии.
+
+После chroot $LFS /usr/bin/env -i ... твой LFS (например, /mnt/lfs) становится для этой сессии “/” — то есть это как будто отдельная система.
+
+Внутри chroot ты не видишь файлы и программы из обычной системы (например, твой хостовый /bin/bash будет недоступен), только то, что лежит в LFS.
+
+Это позволяет собирать настоящую, независимую систему, полностью изолированную от хоста.
+
+Что ещё важно
+Всё до команды chroot делается от root!
+
+Ты должен быть суперпользователем, чтобы монтировать системные каталоги и запускать chroot.
+
+Переменная LFS обязательно должна быть выставлена!
+
+Это гарантирует, что ты не затрёшь что-то на своём реальном хосте.
+
+Монтируются виртуальные файловые системы ядра:
+
+/proc, /sys, /dev, /run — нужны для правильной работы ядра, устройств, инициализации и некоторых программ внутри LFS.
+
+Пошагово: что ты будешь делать
+Монтируешь /dev, /proc, /sys, /run в $LFS
+(Чтобы внутри chroot твоя система могла обращаться к устройствам и ядру — например, видеть список процессов, работать с файлами устройств, обращаться к памяти, монтировать диски и т.д.)
+
+Проверяешь, что всё смонтировано (например, через findmnt):
+
+bash
+Copy
+Edit
+findmnt | grep $LFS
+Выполняешь chroot:
+
+Запускаешь новую оболочку так, что для неё корень — это твой LFS.
+
+После этого ты работаешь как бы “внутри” своей будущей системы, а не в хостовой ОС.
+
+Все последующие команды выполняются как root внутри chroot!
+
+Ты можешь полностью “сломать” LFS, но на хост не повлияешь (если не делать ничего очень опасного с устройствами).
+
+Почему это важно
+Теперь все новые пакеты будут собираться “в чистой среде” — уже не используя ничего с хоста, только твой toolchain.
+
+Это гарантирует, что твой LFS не зависит от старой ОС и будет абсолютно самостоятельным.
+
+Чего остерегаться
+Всё что ты делаешь в chroot, повлияет на будущий LFS!
+Будь осторожен с командами типа rm -rf /, чтобы не разрушить результат своей работы.
+
+Если случайно сделаешь chroot не в тот каталог — можешь навредить хосту, поэтому всегда проверяй, что $LFS выставлен и ты монтируешь/удаляешь/собираешь именно внутри LFS.
+
+Кратко:
+Ты “отключаешься” от хоста, переходишь в свою почти готовую систему.
+
+Вся дальнейшая сборка идёт как root, но уже внутри твоей новой LFS.
+
+Это главный рубеж — дальше твой Linux будет максимально “чистым” и независимым.
+
+Если нужна пошаговая инструкция, как правильно монтировать всё и делать chroot — просто скажи, дам конкретные команды!
+Если остались вопросы — не стесняйся, задай!
+
+
+
+
+
+
+
+
+
+Tools
+
+
+
+ChatGPT can make mistakes. Check important info.
+
+
+https://www.geeksforgeeks.org/chroot-command-in-linux-with-examples/
+
+ChatGPT said:
+Отличный и очень практичный вопрос!
+
+1. Как это устроено в LFS:
+Все основные пакеты из твоего списка устанавливаются в процессе LFS-проекта.
+
+До chroot (глава 6):
+— устанавливаются временные инструменты (toolchain): только то, что необходимо для сборки всего остального в чистой среде.
+
+После chroot (начиная с главы 7):
+— начинается сборка полноценной системы Linux, и в процессе (главы 7-11) по книге будут устанавливаться все остальные пакеты из этого списка.
+
+2. Почему не всё устанавливается до chroot?
+Потому что до chroot ты ещё зависишь от инструментов хост-системы, а в chroot уже полностью изолирован и уверен в своей среде.
+
+Все “настоящие” пакеты (например, Glibc, Coreutils, Bash, Shadow, Vim, GCC, Perl, Groff и т.д.) будут собираться и устанавливаться после chroot — тогда они уже становятся частью твоей реальной LFS-системы.
+
+3. Что делать, если захочешь установить дополнительный пакет?
+Если ты следуешь книге LFS — все нужные пакеты (из твоего списка) будут идти по шагам в главах после chroot.
+
+Если вдруг какой-то специфический пакет не входит в стандарт LFS, его можно установить самостоятельно уже после завершения основного LFS (или даже после первого запуска своего Linux — тогда это будет уже твоя обычная Linux-система, где можно собирать и ставить любые программы как обычно).
+
+4. Итог
+Ты ничего не упустишь, если просто следуешь книге.
+— Все эти пакеты (из твоего списка) в книге LFS будут устанавливаться пошагово — начиная с chroot и дальше.
+
+Если что-то вдруг понадобится вручную — всегда сможешь добавить, когда система будет рабочей.
+
+Пояснение
+До chroot у тебя только “временная” система, она нужна только для сборки настоящей.
+
+После chroot ты строишь свою “чистую” Linux-систему — там уже всё будет как в обычном дистрибутиве.
+
+Кратко:
+— Все основные пакеты из этого списка (и даже больше) будут установлены по книге LFS после chroot.
+— Просто иди по шагам — ничего не пропустишь!
+— Потом (даже после первого запуска LFS) сможешь установить любые дополнительные пакеты как на обычном Linux!
+
+Если хочешь, могу показать список всех пакетов, которые идут по главам книги LFS после chroot (или объяснить, как устанавливать любой сторонний пакет, когда твой LFS будет готов).
+Если сомневаешься — можешь кинуть сюда название интересующего пакета, я скажу, в каком разделе он устанавливается!
+
+Какое ядро используется в chroot?
+Когда ты заходишь в chroot, ты продолжаешь использовать ядро (kernel) своей хост-системы (например, ядро твоего Debian или Ubuntu).
+
+chroot — это не виртуализация и не контейнер! Это просто смена корня файловой системы (то есть ты “видишь” другой /, но всё ещё работаешь под тем же ядром, что и раньше).
+
+Любые системные вызовы, драйверы и все взаимодействие с железом происходят через ядро твоего хоста.
+
+Почему тогда скачивать ядро с kernel.org?
+Твоя цель — собрать свою полностью независимую систему.
+
+После того как ты соберёшь все утилиты и окружение в LFS, ты отдельно скачаешь, соберёшь и установишь своё собственное ядро Linux (именно из исходников с kernel.org).
+
+Только после установки и настройки своего ядра, ты сможешь загрузить свою систему “самостоятельно” — то есть загрузиться уже не в Debian, а прямо в свой LFS!
+
+Этапы:
+chroot — используешь ядро хоста, но работаешь в своём файловом окружении (LFS).
+
+Сборка и установка ядра (где-то в главе 8–9 LFS) — ты скачиваешь исходники ядра с kernel.org, конфигурируешь и собираешь своё ядро, устанавливаешь его в LFS.
+
+Установка загрузчика (GRUB и пр.) — чтобы потом твоя система могла сама загружаться с твоим ядром.
+
+Перезагрузка — если всё сделано правильно, ты загружаешься уже в свою систему на своём ядре, а не через старый Debian.
+
+Итого:
+
+В chroot ты временно используешь ядро хоста.
+
+Позже ты заменишь его своим собственным ядром.
+
+Всё, что касается chroot, относится к пользовательскому пространству (user space), а не к ядру (kernel space).
+
+Если хочется пример:
+Представь, что ты живёшь в чужом доме (это твой хост-Debian), но принесла туда все свои вещи, свою мебель, свои книги (это твой LFS).
+Ты пока пользуешься их отоплением, водой и электричеством (ядро), но всё внутри — уже твоё.
+А когда построишь свою квартиру (поставишь своё ядро), наконец-то переедешь в полностью независимое жилище!
+
+Если есть вопросы по установке и сборке ядра — обязательно напиши! Это один из самых интересных и сложных этапов.
+
+
+
+
+
+
+
+Какое ядро используется в chroot?
+Когда ты заходишь в chroot, ты продолжаешь использовать ядро (kernel) своей хост-системы (например, ядро твоего Debian или Ubuntu).
+
+chroot — это не виртуализация и не контейнер! Это просто смена корня файловой системы (то есть ты “видишь” другой /, но всё ещё работаешь под тем же ядром, что и раньше).
+
+Любые системные вызовы, драйверы и все взаимодействие с железом происходят через ядро твоего хоста.
+
+Почему тогда скачивать ядро с kernel.org?
+Твоя цель — собрать свою полностью независимую систему.
+
+После того как ты соберёшь все утилиты и окружение в LFS, ты отдельно скачаешь, соберёшь и установишь своё собственное ядро Linux (именно из исходников с kernel.org).
+
+Только после установки и настройки своего ядра, ты сможешь загрузить свою систему “самостоятельно” — то есть загрузиться уже не в Debian, а прямо в свой LFS!
+
+Этапы:
+chroot — используешь ядро хоста, но работаешь в своём файловом окружении (LFS).
+
+Сборка и установка ядра (где-то в главе 8–9 LFS) — ты скачиваешь исходники ядра с kernel.org, конфигурируешь и собираешь своё ядро, устанавливаешь его в LFS.
+
+Установка загрузчика (GRUB и пр.) — чтобы потом твоя система могла сама загружаться с твоим ядром.
+
+Перезагрузка — если всё сделано правильно, ты загружаешься уже в свою систему на своём ядре, а не через старый Debian.
+
+Итого:
+
+В chroot ты временно используешь ядро хоста.
+
+Позже ты заменишь его своим собственным ядром.
+
+Всё, что касается chroot, относится к пользовательскому пространству (user space), а не к ядру (kernel space).
+
+Если хочется пример:
+Представь, что ты живёшь в чужом доме (это твой хост-Debian), но принесла туда все свои вещи, свою мебель, свои книги (это твой LFS).
+Ты пока пользуешься их отоплением, водой и электричеством (ядро), но всё внутри — уже твоё.
+А когда построишь свою квартиру (поставишь своё ядро), наконец-то переедешь в полностью независимое жилище!
+
+https://www.geeksforgeeks.org/chroot-command-in-linux-with-examples/
+
+
+Конечно, это один из ключевых шагов в процессе сборки LFS. Давай разберём, что происходит и как это выполнить без ошибок.
+
+Что происходит?
+Ты работал(-а) под пользователем lfs и все файлы в $LFS сейчас принадлежат этому пользователю.
+
+После chroot (и на следующем этапе установки) ты будешь работать под root, и файлы должны быть принадлежать root, а не временному пользователю lfs.
+
+Если не сменить владельца, то:
+
+В будущем новый пользователь с тем же UID (например, 1000) получит полный доступ ко всем этим файлам!
+
+Это потенциальная уязвимость.
+
+Как выполнить этот шаг
+1. Убедись, что ты работаешь под root!
+
+bash
+Copy
+Edit
+whoami
+Должно вернуть root.
+
+2. Проверь, что переменная $LFS корректно установлена для root:
+
+bash
+Copy
+Edit
+echo $LFS
+Должен показать путь, например: /mnt/lfs
+
+Если переменная пуста, нужно снова её задать:
+
+bash
+Copy
+Edit
+export LFS=/mnt/lfs
+(Замени на свой путь, если другой.)
+
+3. Выполни команду смены владельца:
+
+bash
+Copy
+Edit
+chown --from lfs -R root:root $LFS/{usr,var,etc,tools}
+--from lfs — только для файлов, которые принадлежат lfs.
+
+-R — рекурсивно.
+
+root:root — новый владелец и группа.
+
+$LFS/{usr,var,etc,tools} — ключевые директории.
+
+4. Если архитектура x86_64 (99% вероятность, если у тебя 64-битная система), нужно сделать ещё одну команду:
+
+bash
+Copy
+Edit
+chown --from lfs -R root:root $LFS/lib64
+Пояснение про безопасность
+После этого все ключевые системные каталоги будут принадлежать root, и никто кроме root не сможет с ними работать напрямую.
+
+Обычный пользователь не сможет получить доступ к файлам LFS в обход root.
+
+Пошагово для тебя
+Стать root (если не root):
+
+bash
+Copy
+Edit
+su -
+Проверь/установи $LFS:
+
+bash
+Copy
+Edit
+export LFS=/mnt/lfs  # если путь другой — укажи свой
+Выполни команды:
+
+bash
+Copy
+Edit
+chown --from lfs -R root:root $LFS/{usr,var,etc,tools}
+chown --from lfs -R root:root $LFS/lib64
+Если что-то не так
+Если появится ошибка "no such file or directory" для lib64 — не страшно, значит её нет (например, если архитектура 32-бит).
+
+Если что-то не работает — покажи вывод команд.
+
+Готов(-а) перейти к chroot после этого шага! Если нужна помощь с переходом — пиши!
+
+
+
+
+
+
+
+
+
+Tools
+
+Давай разберём, что происходит и как это выполнить без ошибок.
+
+Что происходит?
+Ты работал(-а) под пользователем lfs и все файлы в $LFS сейчас принадлежат этому пользователю.
+
+После chroot (и на следующем этапе установки) ты будешь работать под root, и файлы должны быть принадлежать root, а не временному пользователю lfs.
+
+Если не сменить владельца, то:
+
+В будущем новый пользователь с тем же UID (например, 1000) получит полный доступ ко всем этим файлам!
+
+Это потенциальная уязвимость.
+
+Как выполнить этот шаг
+1. Убедись, что ты работаешь под root!
+
+bash
+Copy
+Edit
+whoami
+Должно вернуть root.
+
+2. Проверь, что переменная $LFS корректно установлена для root:
+
+bash
+Copy
+Edit
+echo $LFS
+Должен показать путь, например: /mnt/lfs
+
+Если переменная пуста, нужно снова её задать:
+
+bash
+Copy
+Edit
+export LFS=/mnt/lfs
+(Замени на свой путь, если другой.)
+
+3. Выполни команду смены владельца:
+
+bash
+Copy
+Edit
+chown --from lfs -R root:root $LFS/{usr,var,etc,tools}
+--from lfs — только для файлов, которые принадлежат lfs.
+
+-R — рекурсивно.
+
+root:root — новый владелец и группа.
+
+$LFS/{usr,var,etc,tools} — ключевые директории.
+
+4. Если архитектура x86_64 (99% вероятность, если у тебя 64-битная система), нужно сделать ещё одну команду:
+
+bash
+Copy
+Edit
+chown --from lfs -R root:root $LFS/lib64
+Пояснение про безопасность
+После этого все ключевые системные каталоги будут принадлежать root, и никто кроме root не сможет с ними работать напрямую.
+
+Обычный пользователь не сможет получить доступ к файлам LFS в обход root.
+
+Пошагово для тебя
+Стать root (если не root):
+
+bash
+Copy
+Edit
+su -
+Проверь/установи $LFS:
+
+bash
+Copy
+Edit
+export LFS=/mnt/lfs  # если путь другой — укажи свой
+Выполни команды:
+
+bash
+Copy
+Edit
+chown --from lfs -R root:root $LFS/{usr,var,etc,tools}
+chown --from lfs -R root:root $LFS/lib64
+Если что-то не так
+Если появится ошибка "no such file or directory" для lib64 — не страшно, значит её нет (например, если архитектура 32-бит).
+
+Если что-то не работает — покажи вывод команд.
+
+Готов(-а) перейти к chroot после этого шага! Если нужна помощь с переходом — пиши!
+
+Отлично, ты уже близко к самому интересному — chroot и сборке основной системы. Давай объясню, что тут происходит, что важно знать, и как это делать пошагово.
+
+Что происходит?
+Когда ты перейдёшь в chroot, твоя будущая система будет "видеть" только свой $LFS-корень.
+Но! Для работы ей нужны виртуальные файловые системы ядра (/dev, /proc, /sys, /run), которые обычно монтируются при загрузке.
+Ты должен смонтировать их в $LFS, чтобы из chroot всё работало корректно:
+
+/dev — устройства (диски, терминалы, мыши и т.д.)
+
+/proc — интерфейс к информации о процессах и состоянии ядра
+
+/sys — информация о железе и драйверах
+
+/run — временные файлы и сокеты
+
+Пошагово, что делать
+1. Создать каталоги для монтирования (если их нет):
+bash
+Copy
+Edit
+mkdir -pv $LFS/{dev,proc,sys,run}
+2. Смонтировать /dev (bind mount)
+bash
+Copy
+Edit
+mount -v --bind /dev $LFS/dev
+Зачем: самый универсальный и безопасный способ, т.к. разные дистрибутивы хоста по-разному работают с /dev.
+
+3. Смонтировать остальные виртуальные ФС:
+bash
+Copy
+Edit
+mount -vt devpts devpts -o gid=5,mode=0620 $LFS/dev/pts
+mount -vt proc proc $LFS/proc
+mount -vt sysfs sysfs $LFS/sys
+mount -vt tmpfs tmpfs $LFS/run
+devpts — для работы псевдотерминалов (например, при работе в chroot через терминал/консоль).
+
+proc — для процессов и информации о системе.
+
+sysfs — для информации о железе.
+
+tmpfs на /run — для временных данных (PID файлов и прочего).
+
+4. Проверь ситуацию с /dev/shm:
+Это "shared memory", нужная многим приложениям.
+
+Иногда это просто директория, иногда симлинк на /run/shm, иногда отдельный монтируемый tmpfs.
+
+Выполни:
+
+bash
+Copy
+Edit
+if [ -h $LFS/dev/shm ]; then
+  install -v -d -m 1777 $LFS$(realpath /dev/shm)
+else
+  mount -vt tmpfs -o nosuid,nodev tmpfs $LFS/dev/shm
+fi
+Если симлинк — создаём директорию по целевому пути.
+
+Если обычная директория — монтируем туда tmpfs.
+
+ВАЖНО!
+Все действия выполнять от root!
+
+$LFS должен быть корректно экспортирован.
+
+После всех монтирований твоя будущая система (LFS) сможет видеть устройства, работать с процессами и использовать системные ресурсы — как обычная Linux.
+
+Перед chroot проверь, что всё смонтировано:
+
+bash
+Copy
+Edit
+mount | grep $LFS
+Должны быть строки типа:
+
+bash
+Copy
+Edit
+/dev on /mnt/lfs/dev type none (rw,bind)
+devpts on /mnt/lfs/dev/pts ...
+proc on /mnt/lfs/proc ...
+sysfs on /mnt/lfs/sys ...
+tmpfs on /mnt/lfs/run ...
+Пример последовательности:
+bash
+Copy
+Edit
+export LFS=/mnt/lfs
+
+mkdir -pv $LFS/{dev,proc,sys,run}
+
+mount -v --bind /dev $LFS/dev
+mount -vt devpts devpts -o gid=5,mode=0620 $LFS/dev/pts
+mount -vt proc proc $LFS/proc
+mount -vt sysfs sysfs $LFS/sys
+mount -vt tmpfs tmpfs $LFS/run
+
+if [ -h $LFS/dev/shm ]; then
+  install -v -d -m 1777 $LFS$(realpath /dev/shm)
+else
+  mount -vt tmpfs -o nosuid,nodev tmpfs $LFS/dev/shm
+fi
+Резюме:
+Ты не создаёшь никаких реальных файлов — только предоставляешь будущей системе доступ к ядру и устройствам через память.
+
+Всё это обязательно делать перед chroot — иначе в chroot не будет работать /dev/null, /proc, /sys и всё, что нужно для сборки и запуска программ.
+
+Если нужна проверка результата или отлов ошибок — просто скинь вывод своих команд, подскажу по ситуации!
+
+Готов(-а) идти в chroot?
+
+
+
+
+
+
+
+
+Отлично, ты уже близко к самому интересному — chroot и сборке основной системы. Давай объясню, что тут происходит, что важно знать, и как это делать пошагово.
+
+Что происходит?
+Когда ты перейдёшь в chroot, твоя будущая система будет "видеть" только свой $LFS-корень.
+Но! Для работы ей нужны виртуальные файловые системы ядра (/dev, /proc, /sys, /run), которые обычно монтируются при загрузке.
+Ты должен смонтировать их в $LFS, чтобы из chroot всё работало корректно:
+
+/dev — устройства (диски, терминалы, мыши и т.д.)
+
+/proc — интерфейс к информации о процессах и состоянии ядра
+
+/sys — информация о железе и драйверах
+
+/run — временные файлы и сокеты
+
+Пошагово, что делать
+1. Создать каталоги для монтирования (если их нет):
+bash
+Copy
+Edit
+mkdir -pv $LFS/{dev,proc,sys,run}
+2. Смонтировать /dev (bind mount)
+bash
+Copy
+Edit
+mount -v --bind /dev $LFS/dev
+Зачем: самый универсальный и безопасный способ, т.к. разные дистрибутивы хоста по-разному работают с /dev.
+
+3. Смонтировать остальные виртуальные ФС:
+bash
+Copy
+Edit
+mount -vt devpts devpts -o gid=5,mode=0620 $LFS/dev/pts
+mount -vt proc proc $LFS/proc
+mount -vt sysfs sysfs $LFS/sys
+mount -vt tmpfs tmpfs $LFS/run
+devpts — для работы псевдотерминалов (например, при работе в chroot через терминал/консоль).
+
+proc — для процессов и информации о системе.
+
+sysfs — для информации о железе.
+
+tmpfs на /run — для временных данных (PID файлов и прочего).
+
+4. Проверь ситуацию с /dev/shm:
+Это "shared memory", нужная многим приложениям.
+
+Иногда это просто директория, иногда симлинк на /run/shm, иногда отдельный монтируемый tmpfs.
+
+Выполни:
+
+bash
+Copy
+Edit
+if [ -h $LFS/dev/shm ]; then
+  install -v -d -m 1777 $LFS$(realpath /dev/shm)
+else
+  mount -vt tmpfs -o nosuid,nodev tmpfs $LFS/dev/shm
+fi
+Если симлинк — создаём директорию по целевому пути.
+
+Если обычная директория — монтируем туда tmpfs.
+
+ВАЖНО!
+Все действия выполнять от root!
+
+$LFS должен быть корректно экспортирован.
+
+После всех монтирований твоя будущая система (LFS) сможет видеть устройства, работать с процессами и использовать системные ресурсы — как обычная Linux.
+
+Перед chroot проверь, что всё смонтировано:
+
+bash
+Copy
+Edit
+mount | grep $LFS
+Должны быть строки типа:
+
+bash
+Copy
+Edit
+/dev on /mnt/lfs/dev type none (rw,bind)
+devpts on /mnt/lfs/dev/pts ...
+proc on /mnt/lfs/proc ...
+sysfs on /mnt/lfs/sys ...
+tmpfs on /mnt/lfs/run ...
+Пример последовательности:
+bash
+Copy
+Edit
+export LFS=/mnt/lfs
+
+mkdir -pv $LFS/{dev,proc,sys,run}
+
+mount -v --bind /dev $LFS/dev
+mount -vt devpts devpts -o gid=5,mode=0620 $LFS/dev/pts
+mount -vt proc proc $LFS/proc
+mount -vt sysfs sysfs $LFS/sys
+mount -vt tmpfs tmpfs $LFS/run
+
+if [ -h $LFS/dev/shm ]; then
+  install -v -d -m 1777 $LFS$(realpath /dev/shm)
+else
+  mount -vt tmpfs -o nosuid,nodev tmpfs $LFS/dev/shm
+fi
+Резюме:
+Ты не создаёшь никаких реальных файлов — только предоставляешь будущей системе доступ к ядру и устройствам через память.
+
+Всё это обязательно делать перед chroot — иначе в chroot не будет работать /dev/null, /proc, /sys и всё, что нужно для сборки и запуска программ.
+
+Если нужна проверка результата или отлов ошибок — просто скинь вывод своих команд, подскажу по ситуации!
+
+Готов(-а) идти в chroot?
+
+
+
+
+
+
+
+тличный вопрос — это очень важно понять!
+
+Зачем делают mount -v --bind /dev $LFS/dev?
+Кратко:
+Эта команда копирует текущее состояние каталога /dev с твоей хостовой системы (той, на которой ты собираешь LFS) в chroot окружение будущей системы (то есть, делает /dev доступным внутри $LFS/dev).
+
+Подробнее
+/dev — это каталог со специальными файлами устройств (например, sda для дисков, tty для терминалов, null, zero, и т.д.).
+
+В большинстве современных Linux систем /dev не хранится на диске — это виртуальная файловая система, которую создаёт ядро при загрузке.
+
+Chroot изолирует будущую систему. Она будет видеть свой корень файловой системы, но если ты просто создашь пустой $LFS/dev, внутри chroot не будет никаких устройств — ни терминала, ни доступа к дискам, ни доступа к системным функциям.
+
+Bind mount позволяет "отразить" (прикрепить) существующий каталог /dev в твою новую файловую систему — так, чтобы внутри chroot все устройства были видимы и работали корректно, будто ты загружен в обычную систему.
+
+Почему не создаём заново, а именно bind mount?
+Разные дистрибутивы по-разному создают /dev, и иногда просто скопировать файлы недостаточно.
+
+Bind-монтирование гарантирует, что все новые устройства, появляющиеся на хосте (например, воткнёшь флешку — появится /dev/sdb), автоматически будут видны и в chroot!
+
+Это самый надёжный и универсальный способ для всех хост-систем.
+
+Что будет без этого шага?
+В chroot не будут работать терминал, ввод/вывод, возможно не будет дисков и других устройств.
+
+Многие программы и сборочные скрипты будут ломаться или зависать, жалуясь на отсутствие устройств.
+
+Как выглядит результат
+После этой команды:
+
+Всё, что есть в /dev на хосте, отображается в $LFS/dev (то есть в /dev твоей будущей системы после chroot).
+
+Коротко:
+Это нужно, чтобы в chroot окружении работали все устройства, как в обычной системе. Без этого ничего не соберёшь!
+
+Если нужны детали про другие монтирования или примеры — спрашивай!
+
+
+
+
+
+
+
+
+
+Tools
+
+
+
+ChatGPT can make mistakes. Check important info.
+
+Отлично! Это очень важный и ответственный шаг — переход в chroot. Давай разберём подробно, что это значит, зачем делается, и как выполнить без ошибок.
+
+Что такое chroot и зачем это делать
+chroot (change root) — это команда, которая запускает программу (обычно bash) с новым корнем файловой системы (/).
+
+После этого ты "оказываешься" внутри будущей LFS-системы, полностью изолированной от хоста.
+
+Все дальнейшие действия: установка ПО, сборка, настройка — выполняются только внутри chroot, чтобы ничего не зависело от твоей основной системы.
+
+Как правильно войти в chroot
+1. Проверь, что всё смонтировано и ты root
+Перед chroot обязательно должны быть выполнены монтирования (/dev, /proc, /sys, /run, /dev/pts, /dev/shm и пр.), как в предыдущих шагах!
+
+Проверь, что ты root:
+
+bash
+Copy
+Edit
+whoami
+Должно вывести root.
+
+2. Экспортируй переменную LFS
+Если её нет, задай:
+
+bash
+Copy
+Edit
+export LFS=/mnt/lfs
+(Замени путь, если у тебя другой.)
+
+3. Выполни команду chroot
+Вот полная команда, которую нужно скопировать и выполнить:
+
+bash
+Copy
+Edit
+chroot "$LFS" /usr/bin/env -i \
+    HOME=/root \
+    TERM="$TERM" \
+    PS1='(lfs chroot) \u:\w\$ ' \
+    PATH=/usr/bin:/usr/sbin \
+    MAKEFLAGS="-j$(nproc)" \
+    TESTSUITEFLAGS="-j$(nproc)" \
+    /bin/bash --login
+Что делает эта команда:
+
+Запускает оболочку Bash внутри $LFS — теперь это твоя "корневая" система.
+
+Очищает все переменные окружения (опция -i у env).
+
+Устанавливает только нужные переменные:
+
+HOME=/root — домашний каталог
+
+TERM=$TERM — поддержка типа терминала (важно для Vim, less, и т.п.)
+
+PS1=... — твой новый приглашение оболочки (будет видно (lfs chroot) root:/#)
+
+PATH=/usr/bin:/usr/sbin — больше нет /tools, используем только новые бинарники
+
+MAKEFLAGS и TESTSUITEFLAGS — указывают использовать все ядра процессора для сборки и тестов
+
+/bin/bash --login — запускает новую сессию Bash как логин-оболочку
+
+4. Что ты увидишь?
+Ты попадёшь в новый шелл, приглашение будет примерно:
+
+perl
+Copy
+Edit
+(lfs chroot) I have no name!:/#
+Это нормально! У LFS пока нет файла /etc/passwd, поэтому имя пользователя не определено (будет позже).
+
+5. ВАЖНО!
+Всё, что дальше по книге, делай только внутри chroot!
+
+Если вдруг пришлось перезагрузить хост — перед chroot снова смонтируй виртуальные файловые системы (dev, proc, sys, run и т.д.), иначе chroot будет "слепой".
+
+6. Пояснения по переменным
+Если хочешь добавить переменные вроде CFLAGS или CXXFLAGS, это можно сделать прямо здесь (или позже через export).
+
+Обычно для LFS достаточно того, что дано в команде выше.
+
+Пошаговая памятка
+Всё смонтировано?
+Проверь:
+
+bash
+Copy
+Edit
+mount | grep $LFS
+Выполни chroot как показано выше.
+
+Внутри chroot начни работу:
+Теперь не нужен $LFS — ты уже "внутри" LFS, пути у тебя обычные (/usr, /bin и т.д.).
+
+Если вдруг что-то не работает
+Появились ошибки — скинь их сюда, я помогу разобраться!
+
+Если не удаётся войти — проверь монтирование и права доступа.
+
+Поздравляю — сейчас начинается настоящая сборка Linux-системы! Если готов(-а) — можешь продолжать по книге. Если хочешь проверить, что всё ок — напиши ls / и покажи результат.
+
+
+
+
+
+
+
+
+Отлично, ты двигаешься по книге ровно как надо!
+Этот шаг — создание финальной структуры директорий в твоей будущей системе, чтобы она соответствовала стандарту FHS (Filesystem Hierarchy Standard).
+
+Что происходит и зачем это нужно
+Файловая система Linux должна иметь чёткую структуру, чтобы все программы, утилиты и сервисы могли найти свои файлы и папки там, где ожидают.
+
+Раньше создавались только минимальные каталоги, нужные для сборки.
+
+Сейчас ты создаёшь полную и “чистую” структуру, как в любой “взрослой” Linux-системе.
+
+Как сделать: пошагово
+Ты уже находишься внутри chroot — все команды выполняй прямо там!
+
+1. Создай основные корневые директории
+bash
+Copy
+Edit
+mkdir -pv /{boot,home,mnt,opt,srv}
+2. Создай дополнительные подкаталоги
+bash
+Copy
+Edit
+mkdir -pv /etc/{opt,sysconfig}
+mkdir -pv /lib/firmware
+mkdir -pv /media/{floppy,cdrom}
+mkdir -pv /usr/{,local/}{include,src}
+mkdir -pv /usr/lib/locale
+mkdir -pv /usr/local/{bin,lib,sbin}
+mkdir -pv /usr/{,local/}share/{color,dict,doc,info,locale,man}
+mkdir -pv /usr/{,local/}share/{misc,terminfo,zoneinfo}
+mkdir -pv /usr/{,local/}share/man/man{1..8}
+mkdir -pv /var/{cache,local,log,mail,opt,spool}
+mkdir -pv /var/lib/{color,misc,locate}
+3. Создай симлинки для совместимости
+bash
+Copy
+Edit
+ln -sfv /run /var/run
+ln -sfv /run/lock /var/lock
+Это нужно для программ, которые ожидают, что lock-файлы будут в /var/run и /var/lock, хотя сейчас всё делается через /run.
+
+4. Установи специальные права доступа на важные каталоги
+bash
+Copy
+Edit
+install -dv -m 0750 /root
+0750: Только root (и его группа) может заходить в /root.
+
+bash
+Copy
+Edit
+install -dv -m 1777 /tmp /var/tmp
+1777: Любой пользователь может писать, но удалять только свои файлы (sticky bit).
+
+5. Проверь отсутствие /usr/lib64
+bash
+Copy
+Edit
+ls -ld /usr/lib64
+Если каталог есть — удали:
+
+bash
+Copy
+Edit
+rm -rf /usr/lib64
+Пояснения по командам
+mkdir -pv ... — создаёт каталоги и вложенные подкаталоги, не ругается если каталог уже есть.
+
+ln -sfv — создаёт симлинк (перезаписывает если есть старый).
+
+install -dv -m ... — создаёт каталог с нужными правами доступа.
+
+Что дальше?
+После выполнения всех этих команд структура файловой системы станет такой, как требует стандарт FHS — это нужно для работы огромного количества программ, пакетов и скриптов.
+
+Резюме:
+Просто выполни все команды из секции по очереди — они безопасны.
+
+Не создавай /usr/lib64 — иначе некоторые пакеты будут собираться и устанавливаться некорректно.
+
+После этого можешь переходить к следующему разделу книги (обычно это “Creating Essential Files and Symlinks”).
+
+Если всё понятно — выполняй! Если появятся вопросы по ходу — просто задай, и я помогу.
+
+
+
+
+
+
+
+
+Отлично! Ты подошёл(-а) к созданию базовых конфигов и симлинков, без которых система не будет работать как положено.
+Давай пошагово и подробно разберём всё, чтобы не было ни одной ошибки.
+
+1. Симлинк для /etc/mtab
+Зачем:
+
+Старые утилиты ищут информацию о смонтированных ФС в /etc/mtab. Сейчас ядро хранит эту инфу в /proc/self/mounts.
+
+Симлинк нужен для совместимости.
+
+Делаем:
+
+bash
+Copy
+Edit
+ln -sv /proc/self/mounts /etc/mtab
+2. Базовый /etc/hosts
+Зачем:
+
+Для тестов и программ, которые ожидают этот файл (например, Perl), и для корректной работы сетевых функций.
+
+Делаем:
+
+bash
+Copy
+Edit
+cat > /etc/hosts << EOF
+127.0.0.1  localhost $(hostname)
+::1        localhost
+EOF
+Первая строка: IPv4-лупбэк, вторая — IPv6.
+
+$(hostname) подставит текущее имя хоста.
+
+3. /etc/passwd — базовый файл пользователей
+Зачем:
+
+Без него не будет пользователей, логина, root и других системных учёток.
+
+Делаем:
+
+bash
+Copy
+Edit
+cat > /etc/passwd << "EOF"
+root:x:0:0:root:/root:/bin/bash
+bin:x:1:1:bin:/dev/null:/usr/bin/false
+daemon:x:6:6:Daemon User:/dev/null:/usr/bin/false
+messagebus:x:18:18:D-Bus Message Daemon User:/run/dbus:/usr/bin/false
+systemd-journal-gateway:x:73:73:systemd Journal Gateway:/:/usr/bin/false
+systemd-journal-remote:x:74:74:systemd Journal Remote:/:/usr/bin/false
+systemd-journal-upload:x:75:75:systemd Journal Upload:/:/usr/bin/false
+systemd-network:x:76:76:systemd Network Management:/:/usr/bin/false
+systemd-resolve:x:77:77:systemd Resolver:/:/usr/bin/false
+systemd-timesync:x:78:78:systemd Time Synchronization:/:/usr/bin/false
+systemd-coredump:x:79:79:systemd Core Dumper:/:/usr/bin/false
+uuidd:x:80:80:UUID Generation Daemon User:/dev/null:/usr/bin/false
+systemd-oom:x:81:81:systemd Out Of Memory Daemon:/:/usr/bin/false
+nobody:x:65534:65534:Unprivileged User:/dev/null:/usr/bin/false
+EOF
+root — суперпользователь.
+
+Все остальные — системные сервисы и аккаунты для демонстрации прав.
+
+4. /etc/group — группы пользователей
+Зачем:
+
+Позволяет управлять правами доступа к файлам/устройствам/службам.
+
+Делаем:
+
+bash
+Copy
+Edit
+cat > /etc/group << "EOF"
+root:x:0:
+bin:x:1:daemon
+sys:x:2:
+kmem:x:3:
+tape:x:4:
+tty:x:5:
+daemon:x:6:
+floppy:x:7:
+disk:x:8:
+lp:x:9:
+dialout:x:10:
+audio:x:11:
+video:x:12:
+utmp:x:13:
+cdrom:x:15:
+adm:x:16:
+messagebus:x:18:
+systemd-journal:x:23:
+input:x:24:
+mail:x:34:
+kvm:x:61:
+systemd-journal-gateway:x:73:
+systemd-journal-remote:x:74:
+systemd-journal-upload:x:75:
+systemd-network:x:76:
+systemd-resolve:x:77:
+systemd-timesync:x:78:
+systemd-coredump:x:79:
+uuidd:x:80:
+systemd-oom:x:81:
+wheel:x:97:
+users:x:999:
+nogroup:x:65534:
+EOF
+root — группа суперпользователя.
+
+Остальные — для сервисов и системных нужд.
+
+5. Временный пользователь для тестов
+Зачем:
+
+Некоторые тесты требуют обычного пользователя.
+
+После тестов его удалят.
+
+Делаем:
+
+bash
+Copy
+Edit
+echo "tester:x:101:101::/home/tester:/bin/bash" >> /etc/passwd
+echo "tester:x:101:" >> /etc/group
+install -o tester -d /home/tester
+install -o tester -d /home/tester создаёт домашний каталог с владельцем tester.
+
+6. Перезапуск оболочки
+Зачем:
+
+До этого у тебя было (lfs chroot) I have no name!, потому что не было /etc/passwd.
+
+Новый шелл будет показывать (lfs chroot) root:/#
+
+Делаем:
+
+bash
+Copy
+Edit
+exec /usr/bin/bash --login
+Это не создаёт новый процесс, а заменяет текущий, оставаясь в chroot.
+
+7. Создание и настройка лог-файлов
+Зачем:
+
+Для корректной работы логина, учёта попыток входа и т.д.
+
+Многие программы ожидают, что эти файлы уже есть.
+
+Делаем:
+
+bash
+Copy
+Edit
+touch /var/log/{btmp,lastlog,faillog,wtmp}
+chgrp -v utmp /var/log/lastlog
+chmod -v 664  /var/log/lastlog
+chmod -v 600  /var/log/btmp
+btmp — неудачные попытки входа (закрытый доступ).
+
+wtmp — успешные логины/логауты.
+
+lastlog — последнее время входа каждого пользователя.
+
+faillog — неудачные попытки входа.
+
+Прямо по шагам: выполни это внутри chroot:
+bash
+Copy
+Edit
+ln -sv /proc/self/mounts /etc/mtab
+
+cat > /etc/hosts << EOF
+127.0.0.1  localhost $(hostname)
+::1        localhost
+EOF
+
+cat > /etc/passwd << "EOF"
+root:x:0:0:root:/root:/bin/bash
+bin:x:1:1:bin:/dev/null:/usr/bin/false
+daemon:x:6:6:Daemon User:/dev/null:/usr/bin/false
+messagebus:x:18:18:D-Bus Message Daemon User:/run/dbus:/usr/bin/false
+systemd-journal-gateway:x:73:73:systemd Journal Gateway:/:/usr/bin/false
+systemd-journal-remote:x:74:74:systemd Journal Remote:/:/usr/bin/false
+systemd-journal-upload:x:75:75:systemd Journal Upload:/:/usr/bin/false
+systemd-network:x:76:76:systemd Network Management:/:/usr/bin/false
+systemd-resolve:x:77:77:systemd Resolver:/:/usr/bin/false
+systemd-timesync:x:78:78:systemd Time Synchronization:/:/usr/bin/false
+systemd-coredump:x:79:79:systemd Core Dumper:/:/usr/bin/false
+uuidd:x:80:80:UUID Generation Daemon User:/dev/null:/usr/bin/false
+systemd-oom:x:81:81:systemd Out Of Memory Daemon:/:/usr/bin/false
+nobody:x:65534:65534:Unprivileged User:/dev/null:/usr/bin/false
+EOF
+
+cat > /etc/group << "EOF"
+root:x:0:
+bin:x:1:daemon
+sys:x:2:
+kmem:x:3:
+tape:x:4:
+tty:x:5:
+daemon:x:6:
+floppy:x:7:
+disk:x:8:
+lp:x:9:
+dialout:x:10:
+audio:x:11:
+video:x:12:
+utmp:x:13:
+cdrom:x:15:
+adm:x:16:
+messagebus:x:18:
+systemd-journal:x:23:
+input:x:24:
+mail:x:34:
+kvm:x:61:
+systemd-journal-gateway:x:73:
+systemd-journal-remote:x:74:
+systemd-journal-upload:x:75:
+systemd-network:x:76:
+systemd-resolve:x:77:
+systemd-timesync:x:78:
+systemd-coredump:x:79:
+uuidd:x:80:
+systemd-oom:x:81:
+wheel:x:97:
+users:x:999:
+nogroup:x:65534:
+EOF
+
+echo "tester:x:101:101::/home/tester:/bin/bash" >> /etc/passwd
+echo "tester:x:101:" >> /etc/group
+install -o tester -d /home/tester
+
+exec /usr/bin/bash --login
+
+touch /var/log/{btmp,lastlog,faillog,wtmp}
+chgrp -v utmp /var/log/lastlog
+chmod -v 664  /var/log/lastlog
+chmod -v 600  /var/log/btmp
+Что делать дальше
+Если в процессе появятся вопросы — просто задай, разберём каждую строку.
+
+После этих шагов ты получишь минимально жизнеспособную систему, в которой работают пользователи, группы, тесты и логины.
+
+Теперь можно идти по книге дальше: сборка и установка основных пакетов.
+
+Всё просто: идёшь по этим шагам по очереди, проверяешь, что всё отрабатывает без ошибок. Если где-то будет непонятно — сразу пиши!
+
+
+
+
+
+
+
+
+Это действительно фундаментальный шаг для “оживления” будущей системы.
+
+1. Символическая ссылка /etc/mtab
+bash
+Copy
+Edit
+ln -sv /proc/self/mounts /etc/mtab
+Зачем?
+
+В старых системах /etc/mtab был обычным файлом, где хранился список смонтированных файловых систем.
+
+Сейчас ядро хранит эту информацию в /proc/self/mounts (это виртуальный файл, который создаёт ядро, его содержимое обновляется в реальном времени).
+
+Некоторые программы всё ещё ожидают увидеть /etc/mtab и читают его для получения списка смонтированных ФС.
+
+Симлинк просто указывает программам, что смотреть надо в /proc/self/mounts.
+
+Результат:
+/etc/mtab теперь всегда содержит актуальную информацию о смонтированных файловых системах.
+
+2. Создание файла /etc/hosts
+bash
+Copy
+Edit
+cat > /etc/hosts << EOF
+127.0.0.1  localhost $(hostname)
+::1        localhost
+EOF
+Зачем?
+
+hosts используется для сопоставления IP-адресов с именами хостов локально, без обращения к DNS.
+
+127.0.0.1 localhost — стандартный IPv4-адрес локальной машины.
+
+::1 localhost — аналогичный IPv6-адрес.
+
+$(hostname) — добавляет текущее имя хоста, чтобы оно тоже "разрешалось" локально (часто требуется для прохождения тестов, и для некоторых программ, которые ругаются, если hostname не определён).
+
+Результат:
+Программы и тесты смогут разрешить localhost и имя твоей машины в IP-адрес.
+
+3. Создание /etc/passwd
+bash
+Copy
+Edit
+cat > /etc/passwd << "EOF"
+root:x:0:0:root:/root:/bin/bash
+...
+EOF
+Зачем?
+
+/etc/passwd — это список пользователей системы.
+
+Каждый пользователь — отдельная строка, поля разделены двоеточиями:
+
+имя_пользователя (например, root)
+
+x — тут раньше был пароль, теперь пароли обычно хранятся в /etc/shadow
+
+uid — идентификатор пользователя (0 для root, 1, 6, и т.д. для системных пользователей)
+
+gid — основная группа пользователя (0 для root и т.д.)
+
+информация — обычно комментарий
+
+домашний_каталог (например, /root)
+
+shell — какая оболочка запускается (/bin/bash, /usr/bin/false если логиниться нельзя)
+
+Примеры:
+
+root:x:0:0:root:/root:/bin/bash — суперпользователь, может делать всё.
+
+daemon:x:6:6:Daemon User:/dev/null:/usr/bin/false — системная учётка для сервисов, не может войти в систему.
+
+Результат:
+Система теперь знает, кто такие root, daemon, bin и другие системные пользователи. Это нужно для запуска сервисов и программ.
+
+4. Создание /etc/group
+bash
+Copy
+Edit
+cat > /etc/group << "EOF"
+root:x:0:
+bin:x:1:daemon
+...
+EOF
+Зачем?
+
+Список групп пользователей. Группы используются для совместного доступа к файлам, устройствам, возможностям.
+
+Формат:
+
+имя_группы (например, root)
+
+x
+
+gid — идентификатор группы (0 для root, 5 для tty и т.д.)
+
+члены группы — дополнительные пользователи, которые состоят в группе через запятую
+
+Примеры:
+
+root:x:0: — суперпользователь.
+
+tty:x:5: — для работы с терминалами.
+
+bin:x:1:daemon — группа bin, туда же входит daemon.
+
+Результат:
+Теперь система знает, какие есть группы и кто в них состоит. Это важно для контроля доступа.
+
+5. Временный пользователь и группа tester
+bash
+Copy
+Edit
+echo "tester:x:101:101::/home/tester:/bin/bash" >> /etc/passwd
+echo "tester:x:101:" >> /etc/group
+install -o tester -d /home/tester
+Зачем?
+
+Некоторые тесты, которые ты будешь запускать в следующей главе, требуют обычного пользователя (не root!).
+
+Ты добавляешь пользователя tester с uid=101, gid=101, домашним каталогом /home/tester и bash в качестве оболочки.
+
+Создаёшь группу tester с gid=101.
+
+install -o tester -d /home/tester — создаёт домашний каталог и сразу назначает владельцем tester (иначе не сможет писать в домашний каталог).
+
+Результат:
+Теперь можно запускать тесты от имени tester.
+
+6. Перезапуск оболочки
+bash
+Copy
+Edit
+exec /usr/bin/bash --login
+Зачем?
+
+До этого при каждой команде у тебя в приглашении шелла было (lfs chroot) I have no name!, потому что файл /etc/passwd ещё не существовал, и имя пользователя определить было невозможно.
+
+После создания /etc/passwd и /etc/group имя будет определяться корректно, и ты увидишь (lfs chroot) root:/#
+
+exec заменяет текущий процесс bash новым — это экономит память и не создаёт дополнительного процесса.
+
+Результат:
+Теперь твой shell будет знать имя пользователя и группы.
+
+7. Инициализация лог-файлов
+bash
+Copy
+Edit
+touch /var/log/{btmp,lastlog,faillog,wtmp}
+chgrp -v utmp /var/log/lastlog
+chmod -v 664  /var/log/lastlog
+chmod -v 600  /var/log/btmp
+Зачем?
+
+Лог-файлы нужны для учёта успешных и неуспешных входов в систему.
+
+wtmp — все входы и выходы пользователей (логины/логауты)
+
+lastlog — последняя активность пользователей
+
+faillog — неудачные попытки входа
+
+btmp — плохие попытки входа, нужен отдельный (закрытый) доступ
+
+chgrp utmp — меняет группу файла lastlog на utmp (требуется для корректной работы некоторых программ)
+
+chmod 664 — lastlog читаем и пишется пользователем и группой
+
+chmod 600 — btmp читается и пишется только root (никто не сможет просматривать неудачные попытки входа, кроме root)
+
+Результат:
+Система сможет вести учёт логинов, что важно для диагностики и безопасности.
+
+Общее резюме
+/etc/mtab — симлинк для совместимости.
+
+/etc/hosts — локальное разрешение имён.
+
+/etc/passwd — описание всех пользователей.
+
+/etc/group — описание всех групп.
+
+tester — временный пользователь для тестов.
+
+Перезапуск bash — shell теперь "видит" имена пользователей.
+
+Лог-файлы — будут хранить информацию о входах в систему.
+
+Проверка
+После перезапуска оболочки командой exec /usr/bin/bash --login — пропадёт "I have no name!".
+
+Можно проверить пользователей и группы:
+
+bash
+Copy
+Edit
+cat /etc/passwd
+cat /etc/group
+Проверить, что файлы логов созданы:
+
+bash
+Copy
+Edit
+ls -l /var/log/
+Проверить, что симлинк mtab:
+
+bash
+Copy
+Edit
+ls -l /etc/mtab
+Если что-то не так — покажи вывод команд или текст ошибки, помогу разобрать ситуацию!
+Всё понятно? Можно идти дальше по книге!
+https://www.linuxfromscratch.org/lfs/view/systemd/chapter07/createfiles.html
+
+Всё отлично с правами файлов — ты всё сделал(а) правильно!
+Теперь давай разберёмся с исходниками.
+
+Почему "No such file or directory"?
+Ты находишься в chroot и пытаешься перейти в /sources/gettext-0.25 или распаковать архив, но его нет в этой директории. Причины могут быть такие:
+
+Архив gettext-0.25.tar.xz находится не там, где ты ищешь.
+
+Архив вообще не скопирован в $LFS/sources перед входом в chroot.
+
+Ты случайно перешёл(шла) не в ту папку.
+
+Что делать?
+1. Посмотри, что есть в /sources:
+bash
+Copy
+Edit
+ls -l /sources
+Есть ли там gettext-0.25.tar.xz?
+
+Есть ли другие исходники?
+
+Если /sources пустой — значит архивы не скопированы.
+
+2. Если архива нет, нужно выйти из chroot и скопировать его
+Открой второе окно терминала (или просто набери exit чтобы выйти из chroot).
+
+Проверь исходники на хостовой системе (например, в /mnt/lfs/sources).
+
+bash
+Copy
+Edit
+ls -l /mnt/lfs/sources
+Если там есть gettext-0.25.tar.xz, заходи обратно в chroot:
+
+bash
+Copy
+Edit
+# Смонтируй всё как раньше (если надо)
+chroot "$LFS" /usr/bin/env -i   \
+    HOME=/root                  \
+    TERM="$TERM"                \
+    PS1='(lfs chroot) \u:\w\$ ' \
+    PATH=/usr/bin:/usr/sbin     \
+    MAKEFLAGS="-j$(nproc)"      \
+    TESTSUITEFLAGS="-j$(nproc)" \
+    /bin/bash --login
+3. Если архива нет вообще — скачай его
+Выйди из chroot, скачай архив в /mnt/lfs/sources, выставь права:
+
+bash
+Copy
+Edit
+wget https://ftp.gnu.org/gnu/gettext/gettext-0.25.tar.xz -O /mnt/lfs/sources/gettext-0.25.tar.xz
+chmod a+wt /mnt/lfs/sources
+4. Возвращайся в chroot и повторяй шаги:
+bash
+Copy
+Edit
+cd /sources
+tar xvf gettext-0.25.tar.xz
+cd gettext-0.25
+Подсказки:
+/sources должен быть доступен для записи всем (chmod a+wt /mnt/lfs/sources), чтобы не было проблем с правами из-под chroot.
+
+Если архив скачан в другую папку — скопируй его в /mnt/lfs/sources.
+
+Всё равно не получается? Покажи вывод команды ls -l /sources — подскажу что делать дальше!
+Очень хороший вопрос!
+Вот зачем нужны именно эти три программы из пакета Gettext — msgfmt, msgmerge, xgettext:
+
+Кратко:
+Это инструменты для работы с переводами (многоязычностью) в Linux.
+Почему только они?
+— Потому что многие пакеты при сборке используют их для обработки файлов перевода, чтобы поддерживать отображение сообщений на разных языках.
+Они нужны не для самой будущей системы, а для успешной сборки других программ, которые требуют переводы.
+
+Что делает каждая из них:
+1. msgfmt
+Для чего:
+Преобразует человекочитаемые файлы переводов (.po) в бинарные (.mo), которые быстро читает программа.
+
+Когда используется:
+Во время сборки программ, чтобы добавить языковые ресурсы.
+
+Пример:
+Ты пишешь перевод для своей программы на русском, сохраняешь как ru.po, а msgfmt делает из него ru.mo, который понимает твоя программа.
+
+2. msgmerge
+Для чего:
+Обновляет файл перевода (.po), добавляя новые строки, появившиеся в шаблоне программы (.pot), и не трогает уже переведённые строки.
+
+Когда используется:
+Если программа обновилась, и появилось больше сообщений для перевода — msgmerge объединяет старый перевод с новым шаблоном.
+
+Пример:
+Было 100 строк — стало 110, msgmerge аккуратно добавит 10 новых, не потеряв твои старые переводы.
+
+3. xgettext
+Для чего:
+Извлекает строки для перевода из исходного кода программы и создаёт шаблон перевода (.pot).
+
+Когда используется:
+При разработке и сборке программ, чтобы найти все сообщения, нуждающиеся в переводе.
+
+Пример:
+В коде есть printf("Hello, World!"); — xgettext найдёт это и добавит в шаблон.
+
+Почему не нужны другие компоненты Gettext?
+Основные библиотеки (libgettext) и вспомогательные программы не требуются на этом этапе, потому что временная система не будет запускать программы, требующие переводов, — только собирать их.
+
+Нам важно, чтобы все пакеты, требующие эти три утилиты, могли успешно собраться с поддержкой многоязычности.
+
+Реальный пример:
+Ты собираешь пакет coreutils, он поддерживает переводы и пытается вызвать msgfmt во время сборки.
+
+Без этих трёх программ сборка зависнет с ошибкой ("msgfmt: command not found").
+
+С этими программами всё собирается, и переводы будут доступны.
+
+Резюме:
+msgfmt — делает бинарные файлы переводов из текстовых.
+
+msgmerge — обновляет переводы без потери уже сделанного.
+
+xgettext — находит и собирает все переводимые строки из исходников.
+
+Это самые базовые инструменты для поддержки NLS (Native Language Support) при сборке ПО!
+
+Если нужна ещё глубже — расскажу или покажу примеры использования прямо в консоли.
+Скажи, интересно?
+То есть, чтобы твоя система, приложения и команды могли выводить сообщения не только на английском, но и на других языках — русском, французском, армянском и любых других.
+
+Примеры из жизни
+Ты ставишь Ubuntu, Fedora, Arch, Windows — они показывают меню, ошибки, подсказки на твоём языке (например: "Файл не найден", "Ошибка доступа" и т.д.).
+
+Ты набираешь в терминале команду с ошибкой, и тебе пишут не только “File not found”, но, если включён перевод, — “Файл не найден”.
+
+Где это работает в Linux
+Почти все большие программы (ls, cp, gcc, bash, systemd, и даже man) поддерживают вывод сообщений и справок на многих языках.
+
+Даже при сборке LFS, если собрать всё с поддержкой русского, ты получишь консоль на русском, а не на английском!
+
+Как это реализуется технически
+В исходном коде разработчик пишет не прямо "File not found", а специальную команду, например:
+
+c
+Copy
+Edit
+printf(_("File not found"));
+(Функция _() или gettext() будет искать перевод)
+
+Специальные утилиты (как раз те три программы) автоматически извлекают все такие строки (xgettext), переводчик переводит их в .po файлы, потом компилируют их в быстрый формат .mo (msgfmt), и программа уже при запуске использует эти переводы.
+
+Почему это важно при сборке LFS
+Многие пакеты (coreutils, bash, glibc и пр.) по умолчанию поддерживают многоязычность.
+
+Если эти три программы не будут доступны при сборке, некоторые пакеты просто не соберутся с поддержкой переводов, или сборка остановится с ошибкой.
+
+Ещё проще:
+Не про языки программирования!
+
+Про человеческие языки — русский, английский, армянский, китайский...
+
+Эти три программы нужны, чтобы твоя (и любая другая) система могла "общаться" с пользователем на понятном ему языке.
+
+Проверь на практике:
+Попробуй на любом современном Linux:
+
+bash
+Copy
+Edit
+LANG=ru_RU.UTF-8 ls /no_such_file
+→ Выведет ошибку на русском (если есть поддержка перевода).
+
+А с английским:
+
+bash
+Copy
+Edit
+LANG=en_US.UTF-8 ls /no_such_file
+→ “No such file or directory”
+
+Резюме
+Многоязычность (NLS) — это не про синтаксис кода, а про то, чтобы программы могли выводить сообщения пользователю на разных языках.
+
+Инструменты msgfmt, msgmerge, xgettext нужны только для обработки этих переводов во время сборки ПО.
+
+Если интересно, могу показать пример, как делают перевод для Linux-программы "с нуля" — прямо на командной строке!
+
+Что такое Bison и зачем он нужен?
+Bison — это генератор парсеров (анализаторов синтаксиса), аналог yacc.
+
+Он автоматически создаёт программы, которые анализируют и разбирают язык (например, математические выражения, конфиги, язык программирования).
+
+Bison нужен для сборки многих других пакетов — без него часто нельзя собрать bash, coreutils и другое ПО.
+
+Шаги по установке (всё делаем внутри chroot):
+1. Перейди в папку с исходниками Bison
+bash
+Copy
+Edit
+cd /sources/bison-3.8.2
+(Если не распакован архив, сначала: tar xvf bison-3.8.2.tar.xz)
+
+2. Конфигурируй сборку
+bash
+Copy
+Edit
+./configure --prefix=/usr \
+            --docdir=/usr/share/doc/bison-3.8.2
+--prefix=/usr — установит все бинарники и библиотеки в /usr (как принято в нормальных системах).
+
+--docdir=/usr/share/doc/bison-3.8.2 — документация попадёт в отдельную версионную папку (удобно, если будет несколько версий).
+
+3. Собери пакет
+bash
+Copy
+Edit
+make
+Запускает процесс сборки — будет скомпилирован сам bison и сопутствующие файлы.
+
+4. Установи пакет
+bash
+Copy
+Edit
+make install
+Копирует bison и всё необходимое в твою систему внутри chroot.
+
+5. (Опционально) Проверь, что всё установилось
+bash
+Copy
+Edit
+which bison
+bison --version
+Должно вывести путь /usr/bin/bison и версию 3.8.2.
+
+6. (Опционально) Можно удалить директорию сборки, чтобы освободить место:
+bash
+Copy
+Edit
+cd /sources
+rm -rf bison-3.8.2
+Почему шаги такие простые?
+На этом этапе ты собираешь временную утилиту (toolchain), поэтому конфигурация минимальна.
+
+Bison обычно не требует доп. опций — его задача: быть и работать для сборки последующих пакетов.
+
+Резюме шагов:
+bash
+Copy
+Edit
+cd /sources/bison-3.8.2
+./configure --prefix=/usr --docdir=/usr/share/doc/bison-3.8.2
+make
+make install
+— Всё! Можно переходить к следующему пакету по книге.
+
+Если что-то не соберётся — пришли текст ошибки, помогу разобрать!
+Ты двигаешься отлично, так держать!
+
+
+
+
+
+
+
+https://blog.skillfactory.ru/glossary/perl/
+Содержание
+
+Perl — это язык программирования, который создали специально для обработки текста. Со временем он расширился и стал использоваться в большем количестве сфер. С помощью Perl можно «соединять» между собой программы, написанные на разных языках.
+
+Язык программирования Perl появился в 80-х. Его автор по образованию был лингвистом. В последние годы язык не на слуху: многие начинающие разработчики не в курсе о его существовании, но он все равно остается важной технологией.
+
+Название Perl иногда расшифровывают как Practical Extraction and Report Language — язык для практического извлечения данных и составления отчетов. Хотя существует несколько версий происхождения названия: от слова pearl («жемчужина») или от имени невесты создателя. По-русски название звучит как «перл».
+
+Первая версия Perl 1 вышла в 1987 году, а актуальная версия языка на момент написания статьи —  Perl 5.38.0.
+
+
+«IT-специалист с нуля» наш лучший курс для старта в IT«IT-специалист с нуля» наш лучший курс для старта в IT
+Что такое Perl
+Этот язык программирования — высокоуровневый, то есть работает с понятиями, близкими человеку. Он интерпретируемый: программы не компилируются целиком перед запуском, а исполняются построчно с помощью интерпретатора Perl. Благодаря этому язык может работать с разными платформами и операционными системами.
+
+По синтаксису Perl похож на язык C и одновременно с этим — на Shell, оболочку для командной строки операционных систем Unix и Linux. Оба этих языка довольно специфичные, а сам Perl позаимствовал многое у естественных человеческих языков, поэтому он не похож на другие языки программирования. Perl довольно сложен в изучении для новичков, но зато у него есть много интересных возможностей.
+
+Perl умеет работать с данными независимо от того, в каком виде они пришли, поддерживает регулярные выражения и несколько парадигм программирования. Одну и ту же задачу в нем можно выполнить разными способами.
+
+Для чего нужен Perl
+Этот язык иногда называют скотчем для интернета. С его помощью можно собрать воедино программы на разных языках, потому что Perl умеет мощно и гибко работать с данными и операционной системой. Например, с Perl можно быстро перевести результат работы одной программы в формат, понятный другой.
+
+На практике Perl используют для нескольких целей:
+
+системного программирования — благодаря гибкой работе с ОС язык хорошо подходит, чтобы автоматизировать действия в операционной системе, а еще помогает администрировать компьютерные сети и системы;
+скриптов для связи между компонентами — например, двумя программами или сервером и клиентом;
+работы с текстом и символьными данными — это изначальное назначение Perl, и он до сих пор отлично подходит для обработки текстовой информации;
+поддержки legacy-кода — старого кода, который не сочетается с новыми технологиями, поэтому для его поддержки нужно пользоваться старыми языками.
+Программирование на Perl встречалось в любых сферах: от веба до биоинформатики. Сейчас он сдал позиции, а его ниша во многом перешла к более современному Python. Новые проекты на Perl встретить почти невозможно, но в старых программах его по-прежнему много.
+
+Курс для новичков «IT-специалист
+с нуля» – разберемся, какая профессия вам подходит, и поможем вам ее освоить
+Подробнее
+Курс для новичков «IT-специалист с нуля» – разберемся, какая профессия вам подходит, и поможем вам ее освоить
+Принципы Perl
+Создатель языка Perl Ларри Уолл придерживался нескольких принципов, на которых и построен язык.
+
+TMTOWTDI, или There’s more than one way to do it. Переводится как «существует больше одного способа это сделать» и отражает одну из главных особенностей Perl — многообразие решений для одной и той же задачи.
+Easy things should be easy and hard things should be possible — «простые вещи должны быть простыми, а сложные вещи должны быть возможными». То есть, язык должен не усложнять простое, но давать возможность сделать что-то сложное.
+Три главных добродетели разработчика — лень, нетерпеливость и самомнение. Так считал создатель Perl, поэтому создал язык, который отвечает этой идее.
+Еще один принцип Perl, который отличает его от большинства языков программирования, — неоднозначность. Значение той или иной конструкции в нем может зависеть от контекста, а это противоположно строго формальному подходу к языкам программирования. Кажется, будто такой подход делает язык неудобным, но фактически это ближе к особенностям человеческого мышления.
+
+Особенности Perl
+Кроссплатформенность. Perl по умолчанию поставляется вместе с UNIX и Linux-системами. Но поддержка языка есть и в Windows, и еще во многих ОС — всего Perl поддерживается более чем на 100 платформах.
+Возможность работы с большими массивами данных и сложными структурами. С помощью Perl можно обрабатывать почти любую информацию, и он способен сам определить тип данных. 
+Многообразие и ситуативная неоднозначность. С Perl можно работать в разных парадигмах программирования, он допускает разные способы решения одной и той же задачи. В нем ограниченное количество конструкций, зато разные способы их применения. 
+Сходство с естественными языками. Языки, на которых разговаривают люди, — в меру многословные и избыточные, но поэтому гибкие. Можно сказать одну и ту же вещь деловым языком, разговорной речью или в формате шутки. Perl такой же. Он учитывает, что разработчики — разные, и дает каждому возможность «высказаться» по-своему.
+Преимущества Perl
+Надежный и хорошо работающий код. Старый код на Perl может работать без сбоев до сих пор, потому что программы на нем надежные и предсказуемые. Кстати, это причина, почему проектов на Perl до сих пор хватает, хотя поддержка языка хуже, чем раньше.
+
+Разнообразие подходов. Perl — мощный и гибкий язык. Вся его философия говорит, что решить какую-то задачу можно несколькими способами. А еще он подходит для огромного количества задач, как простых, так и сложных. Perl очень практичный: одним языком можно закрыть сразу несколько потребностей разработчика.
+
+Поддержка регулярных выражений. Многие языки программирования могут читать регулярные выражения, но мало какие способны на это в той же мере, что и Perl. Он поддерживает их полностью. Весь скрипт может состоять из регулярных выражений и со стороны выглядеть как странный набор символов, а Perl поймет это и выполнит. Регулярные выражения очень важны для обработки данных, поиска нужной информации, парсинга и других подобных действий. 
+
+Мощная работа с данными. В первую очередь с символьными, то есть строками и текстом, но не только. Для Perl не имеет значения, в каком виде к нему пришла информация: благодаря регулярным выражениям и инструментам для работы с данными он сможет «вытащить» нужные сведения и преобразовать в необходимый вид. Поэтому его и используют для связи между компонентами.
+
+Скорость. Perl задумывался как язык, который по скорости может сравниться с нативными Unix-утилитами. Сейчас сложно сказать, насколько он достиг этой цели, но работает быстро. Поэтому его используют в том числе чтобы создавать скрипты с хорошим быстродействием.
+
+Недостатки Perl
+Неочевидность. Одно из главных достоинств Perl — это одновременно и минус. В современной разработке важно, чтобы код был очевидным для сторонних разработчиков. А с Perl не получится просто взглянуть на программу и понять, что она делает. Даже примеры кода на Perl могут отпугнуть. Так вышло из-за той самой ситуативной неоднозначности, когда смысл конструкции зависит от ее контекста. А еще из-за обилия регулярных выражений.
+
+Высокий порог входа. Еще один минус — Perl сложен для новичков. Во многом из-за той самой неочевидности его не советуют изучать первым языком. Понять его может быть сложно даже действующим разработчикам, которые начинали с более современных языков.
+
+Низкая востребованность. Новых проектов на Perl почти нет, а команды для старых обычно набраны и редко меняются. Поэтому найти вакансию, где нужно программировать на Perl, довольно сложно. Вакансий для новичков почти нет, ищут опытных разработчиков. Часто это люди, которые начинали IT-карьеру еще в годы расцвета Perl и поэтому успели активно с ним поработать.
+
+Отсутствие активного комьюнити. Разработчики говорят, что Perl умер — к сожалению, доля истины в этом есть. Дело в том, что язык практически не обновляется. Существующие библиотеки почти не развиваются, новых не выходит, а количество энтузиастов становится все меньше. А если нет развития — нет и поддержки новых технологий, которые в IT появляются постоянно. Но действующему разработчику язык все еще может пригодиться, в том числе в реальных проектах.
+
+Как начать изучать Perl
+Perl не рекомендуют изучать как первый язык программирования: он слишком специфичный и непохожий на другие, а еще довольно сложный в понимании. Чтобы в нем разобраться, желательно уже иметь опыт работы с C-подобными языками и шелл-скриптами, а еще понимать регулярные выражения. К тому же у языка нет активного русскоязычного сообщества, и это может дополнительно усложнить изучение.
+
+Но нет ничего невозможного. Изучать основы Perl можно по книгам и статьям для разработчиков разных уровней. А еще он отлично подходит как второй или третий язык программирования, который поможет быстро и эффективно связывать между собой проекты на разных языках.
+
+
+Что такое Perl и зачем он нужен в LFS
+Perl — очень мощный и популярный язык программирования для обработки текста, генерации отчётов, работы с файлами и т.д.
+
+Многие скрипты и утилиты в Linux (особенно для автоматизации сборки, тестирования, администрирования) используют Perl.
+
+На этом этапе Perl нужен только как временный инструмент для сборки других пакетов.
+
+Пошаговая инструкция
+1. Перейди в папку с исходниками Perl
+bash
+Copy
+Edit
+cd /sources/perl-5.40.2
+(Если архив не распакован: tar xvf perl-5.40.2.tar.xz)
+
+2. Конфигурируй сборку Perl
+Выполни длинную команду (копируй как есть):
+
+bash
+Copy
+Edit
+sh Configure -des \
+  -D prefix=/usr \
+  -D vendorprefix=/usr \
+  -D useshrplib \
+  -D privlib=/usr/lib/perl5/5.40/core_perl \
+  -D archlib=/usr/lib/perl5/5.40/core_perl \
+  -D sitelib=/usr/lib/perl5/5.40/site_perl \
+  -D sitearch=/usr/lib/perl5/5.40/site_perl \
+  -D vendorlib=/usr/lib/perl5/5.40/vendor_perl \
+  -D vendorarch=/usr/lib/perl5/5.40/vendor_perl
+Что делают опции:
+
+-des — автоматические ответы на все вопросы (по умолчанию), быстро, без лишних запросов.
+
+-D prefix=/usr — ставить всё основное в /usr.
+
+-D vendorprefix=/usr — Perl будет знать, что дополнительные модули (от других пакетов) тоже надо искать в /usr.
+
+-D useshrplib — собрать динамическую библиотеку Perl (не только статическую).
+
+Остальные -D ... — путь, где Perl будет искать свои модули: отдельно для ядра, сайта, сторонних и т.д., по версии Perl (удобно для обновлений).
+
+3. Собери пакет
+bash
+Copy
+Edit
+make
+Сборка может занять 5–15 минут (зависит от мощности системы).
+
+4. Установи Perl
+bash
+Copy
+Edit
+make install
+Копирует всё, что собрано, в /usr/bin, /usr/lib и соответствующие директории для модулей.
+
+5. Проверь установку (опционально)
+bash
+Copy
+Edit
+perl -v
+Должно вывести версию 5.40.2 и приветствие Perl.
+
+6. (По желанию) Очисти исходники
+bash
+Copy
+Edit
+cd /sources
+rm -rf perl-5.40.2
+Это освобождает место, но не обязательно.
+
+Краткая памятка (всё вместе):
+bash
+Copy
+Edit
+cd /sources/perl-5.40.2
+
+sh Configure -des \
+  -D prefix=/usr \
+  -D vendorprefix=/usr \
+  -D useshrplib \
+  -D privlib=/usr/lib/perl5/5.40/core_perl \
+  -D archlib=/usr/lib/perl5/5.40/core_perl \
+  -D sitelib=/usr/lib/perl5/5.40/site_perl \
+  -D sitearch=/usr/lib/perl5/5.40/site_perl \
+  -D vendorlib=/usr/lib/perl5/5.40/vendor_perl \
+  -D vendorarch=/usr/lib/perl5/5.40/vendor_perl
+
+make
+make install
+perl -v
+Что делать дальше?
+Если всё собрано и Perl показывает свою версию — переходи к следующему пакету из LFS-книги.
+
+Если возникнут ошибки — скинь их текст, помогу разобрать!
+
+Ты идёшь очень хорошо, и так шаг за шагом соберёшь свою собственную Linux-систему! Если что-то не ясно или хочется узнать детали про Perl — спрашивай, всё расскажу.
+
+
+
+
+
+
+
+
+
+Tools
+
+
+
+ChatGPT can make mistakes. Check important info.
+https://www.techtarget.com/whatis/definition/Perl
+
+Отлично, идём дальше — сейчас соберём Python 3 (один из самых важных и “капризных” временных инструментов в LFS).
+Объясню шаг за шагом, на что обратить внимание и почему так.
+
+Что такое Python и зачем он сейчас нужен
+Python — очень популярный язык программирования (скрипты, автоматизация, инфраструктура).
+
+Многие современные инструменты используют Python для сборки, тестирования или вспомогательных скриптов.
+
+На этом этапе нам не нужны все модули Python и менеджер пакетов, только базовый интерпретатор.
+
+Внимание к архиву!
+В LFS-сборке часто лежат два архива:
+
+python-3.13.3.tar.xz (с маленькой буквы) — НЕ использовать!
+
+Python-3.13.3.tar.xz (с большой буквы) — вот ЭТОТ и надо распаковывать!
+
+Пошаговая инструкция
+1. Перейди в папку /sources
+bash
+Copy
+Edit
+cd /sources
+2. Распакуй архив (если ещё не распакован):
+bash
+Copy
+Edit
+tar xvf Python-3.13.3.tar.xz
+cd Python-3.13.3
+3. Конфигурируй сборку
+bash
+Copy
+Edit
+./configure --prefix=/usr   \
+            --enable-shared \
+            --without-ensurepip
+--prefix=/usr — устанавливаем всё в стандартное место.
+
+--enable-shared — используем динамические библиотеки (как принято для временного инструментария).
+
+--without-ensurepip — не собираем pip, потому что нам не нужен менеджер пакетов на этом этапе.
+
+4. Сборка
+bash
+Copy
+Edit
+make
+Если появятся предупреждения типа “ssl module not built” — игнорируй, это ожидаемо (ещё нет нужных зависимостей, они будут позже).
+
+5. Установка
+bash
+Copy
+Edit
+make install
+После этого Python будет доступен в системе (внутри chroot).
+
+6. Проверка (опционально):
+bash
+Copy
+Edit
+python3 --version
+Должно вывести Python 3.13.3.
+
+7. (Опционально) Очистка исходников
+bash
+Copy
+Edit
+cd /sources
+rm -rf Python-3.13.3
+Если что-то пошло не так:
+Если make завершился с ошибкой — скинь полный текст ошибки.
+
+Если только отдельные модули не собрались (ssl, bz2 и пр.), а основная сборка завершилась успешно — это нормально на этом этапе.
+
+Резюме
+bash
+Copy
+Edit
+cd /sources
+tar xvf Python-3.13.3.tar.xz
+cd Python-3.13.3
+./configure --prefix=/usr --enable-shared --without-ensurepip
+make
+make install
+python3 --version
+Если будут вопросы — спрашивай, разберём любую ошибку!
+
+Ты на правильном пути!
+Python — один из ключевых инструментов, после него сборка станет проще.
+
+
+
+
+
+
+
+Этот шаг — один из самых простых в LFS: устанавливается Texinfo, который нужен для работы с документацией в формате info (аналог man-страниц).
+
+Что такое Texinfo и зачем он нужен
+Texinfo — это система для написания документации к программам в формате “info” (например, команда info gcc открывает документацию GCC).
+
+Многие пакеты в Linux используют именно info-страницы для справки.
+
+На этом этапе Texinfo требуется для генерации документации при сборке других пакетов (например, makeinfo нужен для создания info-файлов).
+
+Пошаговая инструкция (всё внутри chroot)
+1. Перейди в директорию с исходниками
+bash
+Copy
+Edit
+cd /sources/texinfo-7.2
+(Если архив не распакован — сначала: tar xvf texinfo-7.2.tar.xz)
+
+2. Настрой сборку
+bash
+Copy
+Edit
+./configure --prefix=/usr
+Всё стандартно: устанавливаем в /usr.
+
+3. Собери пакет
+bash
+Copy
+Edit
+make
+Пройдёт быстрая сборка (обычно < 5 минут).
+
+4. Установи пакет
+bash
+Copy
+Edit
+make install
+Все бинарники, скрипты и инфо-страницы попадут в нужные директории.
+
+5. (Опционально) Проверь, что всё установилось
+bash
+Copy
+Edit
+info --version
+Должно вывести версию info (Texinfo), например: info (GNU texinfo) 7.2.
+
+6. (Опционально) Очисти исходники
+bash
+Copy
+Edit
+cd /sources
+rm -rf texinfo-7.2
+Краткая памятка по шагам:
+bash
+Copy
+Edit
+cd /sources/texinfo-7.2
+./configure --prefix=/usr
+make
+make install
+info --version
+Что делать дальше?
+Если команда info --version работает, переходи к следующему пакету из книги LFS.
+
+Если появится ошибка — скинь её текст, я помогу!
+
+Этот шаг — “рутинный”, тут редко бывают проблемы. Можешь выполнять все команды как есть!
+https://www.geeksforgeeks.org/info-command-in-linux-with-examples/
+
+Супер, это последний большой пакет на этапе временных инструментов — util-linux!
+Давай подробно по шагам, что делать и почему.
+
+Что такое util-linux и зачем он нужен
+util-linux — огромный набор базовых системных утилит: mount, umount, lsblk, fdisk, kill, dmesg, hwclock, login, more, uuidgen, и многое другое.
+
+Без этих программ почти ни одна Linux-система не будет “живой”.
+
+Сейчас ты соберёшь временные версии только самых нужных инструментов, чтобы можно было собрать финальную систему.
+
+Пошаговая инструкция
+1. Создай каталог для аппаратных часов (по стандарту FHS):
+bash
+Copy
+Edit
+mkdir -pv /var/lib/hwclock
+По умолчанию многие программы ищут файл /etc/adjtime, но стандарт рекомендует /var/lib/hwclock/adjtime.
+
+2. Перейди в директорию с исходниками util-linux:
+bash
+Copy
+Edit
+cd /sources/util-linux-2.41
+(Если архив не распакован — сначала: tar xvf util-linux-2.41.tar.xz)
+
+3. Настрой сборку с нужными опциями:
+bash
+Copy
+Edit
+./configure --libdir=/usr/lib     \
+            --runstatedir=/run    \
+            --disable-chfn-chsh   \
+            --disable-login       \
+            --disable-nologin     \
+            --disable-su          \
+            --disable-setpriv     \
+            --disable-runuser     \
+            --disable-pylibmount  \
+            --disable-static      \
+            --disable-liblastlog2 \
+            --without-python      \
+            ADJTIME_PATH=/var/lib/hwclock/adjtime \
+            --docdir=/usr/share/doc/util-linux-2.41
+Все опции нужны:
+
+Отключают ненужные утилиты и Python-модули (их соберёшь позже в настоящей системе, когда будут все зависимости).
+
+Корректно указывают, куда сохранять файлы настроек и документации.
+
+Не собирают статические библиотеки (они не нужны).
+
+4. Собери пакет:
+bash
+Copy
+Edit
+make
+Обычно сборка идёт быстро (несколько минут).
+
+5. Установи пакет:
+bash
+Copy
+Edit
+make install
+Все необходимые программы будут скопированы в твой chroot /usr/bin, /usr/sbin и другие директории.
+
+6. (Опционально) Проверь работу некоторых утилит:
+bash
+Copy
+Edit
+lsblk
+dmesg | head -5
+uuidgen
+Если видишь нормальный вывод — всё отлично.
+
+7. (Опционально) Очисти исходники:
+bash
+Copy
+Edit
+cd /sources
+rm -rf util-linux-2.41
+Итого, весь процесс:
+bash
+Copy
+Edit
+mkdir -pv /var/lib/hwclock
+
+cd /sources/util-linux-2.41
+
+./configure --libdir=/usr/lib     \
+            --runstatedir=/run    \
+            --disable-chfn-chsh   \
+            --disable-login       \
+            --disable-nologin     \
+            --disable-su          \
+            --disable-setpriv     \
+            --disable-runuser     \
+            --disable-pylibmount  \
+            --disable-static      \
+            --disable-liblastlog2 \
+            --without-python      \
+            ADJTIME_PATH=/var/lib/hwclock/adjtime \
+            --docdir=/usr/share/doc/util-linux-2.41
+
+make
+make install
+Что делать дальше?
+После util-linux — чистка системы и подготовка к сборке настоящей (финальной) системы!
+
+Если появятся ошибки или предупреждения — присылай их, помогу разобраться!
+
+Ты на финальном этапе временной системы — поздравляю! Всё идёт по плану, продолжай так же уверенно!
+
+
+
+
+
+
+
+
+
+Tools
+
+
+
+
+Что такое Hardware Clock?
+Hardware clock (аппаратные часы, RTC — Real Time Clock) — это микросхема в компьютере, которая отслеживает текущее время даже тогда, когда компьютер выключен.
+
+Обычно эта микросхема питается от батарейки (маленькая круглая батарейка на материнской плате).
+
+Она хранит дату и время, пока компьютер выключен.
+
+Для чего он нужен?
+Когда ты включаешь компьютер, BIOS (UEFI) и операционная система читают текущее время именно из этих аппаратных часов.
+
+Linux и другие ОС используют это время для:
+
+Установки “системных” часов (т.н. System Clock, Software Clock).
+
+Корректной работы журналов, файловой системы, планировщика задач и т.д.
+
+Правильного отображения времени в системе (логах, файлах, выводе времени и даты).
+
+В Linux есть два вида часов:
+Аппаратные часы (Hardware clock, RTC, hwclock)
+
+Работают всегда, даже при выключенном компьютере.
+
+Их можно смотреть и менять с помощью команды:
+
+bash
+Copy
+Edit
+hwclock
+Системные часы (System clock, Software clock)
+
+Это “внутреннее” время, которое отслеживается ядром Linux с момента загрузки.
+
+После загрузки система обычно копирует время из hardware clock в system clock.
+
+Почему важен путь /var/lib/hwclock/adjtime?
+В этом файле сохраняются коррекции для аппаратных часов: например, если аппаратные часы отстают или спешат, Linux может корректировать их показания.
+
+По стандарту FHS (Filesystem Hierarchy Standard) такой файл должен лежать в каталоге данных, а не в /etc (как это было раньше).
+
+Примеры использования аппаратных часов:
+Узнать текущее значение аппаратных часов:
+
+bash
+Copy
+Edit
+hwclock --show
+Установить аппаратные часы по системным:
+
+bash
+Copy
+Edit
+hwclock --systohc
+Установить системные часы по аппаратным:
+
+bash
+Copy
+Edit
+hwclock --hctosys
+Почему это важно для сборки LFS?
+Многие программы при работе с временем обращаются и к системным, и к аппаратным часам.
+
+Корректное размещение файла adjtime (по FHS — /var/lib/hwclock/adjtime) гарантирует, что всё будет работать по стандарту и не возникнет конфликтов после установки финальной системы.
+
+Резюме:
+Hardware clock — это физические часы в компьютере, которые показывают время даже при выключенном питании.
+
+Linux использует их для синхронизации времени.
+
+Файл /var/lib/hwclock/adjtime нужен для хранения коррекций хода этих часов.
+
+Всё это помогает твоей будущей системе всегда знать “правильное время”.
+
+Если хочешь — покажу, как посмотреть/настроить аппаратные часы на своей системе, или расскажу, как они взаимодействуют с системными часами и ntpd/chrony (интернет-сервисы синхронизации)!
+
+
+
+
+
+
+
+
+
+Tools
+
+
+
+https://www.geeksforgeeks.org/hwclock-command-in-linux-with-examples/
+
+ аппаратные часы (hardware clock, RTC, Real Time Clock) — это физическое устройство!
+
+Подробнее:
+Это отдельная микросхема (чип) на материнской плате компьютера, ноутбука, сервера и даже на большинстве смартфонов.
+
+У неё есть собственная батарейка (обычно круглая таблетка — тип CR2032), чтобы часы продолжали работать даже когда компьютер полностью выключен или отключён от сети.
+
+Часы ведут отсчёт времени независимо от операционной системы. Даже если ты сменишь Linux на Windows, сбросишь BIOS или снимешь жёсткий диск — эти часы всё равно идут!
+
+Как выглядят эти часы?
+Их нельзя “потрогать” отдельно — это часть материнской платы.
+
+Если вынуть батарейку — время собьётся, и при следующем включении BIOS покажет неверную дату/время (или 01.01.2000, или что-то подобное).
+
+На схемах и в документации они называются:
+RTC — Real Time Clock
+
+CMOS Clock
+
+BIOS clock
+
+Hardware clock
+
+Пример из жизни:
+Если ты выключишь компьютер, вытащишь из розетки и через неделю снова включишь — на экране BIOS увидишь текущее время и дату. Это значит, что “железные” часы всё это время работали от батарейки.
+
+Как проверить, что это физическое устройство?
+Команда hwclock работает только с этим устройством!
+
+Если вынуть батарейку с материнской платы, а потом снова включить ПК — время “обнулится”.
+
+Резюме:
+Да, hardware clock — это именно физическая микросхема с батарейкой, которая живёт на материнской плате и хранит время “железно”.
+
+Если интересно, могу показать схему, фото или объяснить, как они работают на телефонах и других устройствах!
+
+
+
+
+
+
+
+
+
+Tools
+
+
+
+
+7.13.1. Cleaning — Очистка системы
+1. Удаляем документацию временных инструментов
+bash
+Copy
+Edit
+rm -rf /usr/share/{info,man,doc}/*
+Зачем?
+Документация временных утилит сейчас не нужна — в финальной системе ты всё пересоберёшь и получишь свежую документацию.
+
+Плюс: экономия около 35 МБ места.
+
+2. Удаляем libtool .la файлы
+bash
+Copy
+Edit
+find /usr/{lib,libexec} -name \*.la -delete
+Зачем?
+Эти файлы нужны только для специфических целей (libltdl), а большинство программ в Linux сейчас их не используют.
+
+Если их оставить: это может вызвать конфликты и ошибки на следующих этапах сборки (особенно в BLFS).
+
+3. Удаляем временный каталог /tools
+bash
+Copy
+Edit
+rm -rf /tools
+Зачем?
+Всё нужное уже собрано в системе, папка /tools больше не нужна (экономия ~1 ГБ).
+
+ВАЖНО: убедись, что ты внутри chroot, и /tools реально относится к твоему LFS.
+
+7.13.2. Backup — Создание бэкапа
+Этот шаг — опциональный, но ОЧЕНЬ РЕКОМЕНДУЕТСЯ!
+
+Если ты не хочешь рисковать потерей нескольких дней работы из-за одной случайной ошибки — обязательно сделай бэкап.
+
+Как сделать бэкап?
+1. Выйди из chroot
+bash
+Copy
+Edit
+exit
+Зачем?
+Чтобы иметь доступ к корню файловой системы хоста и сохранить архив вне $LFS.
+
+2. Проверь, что переменная $LFS задана для пользователя root
+bash
+Copy
+Edit
+echo $LFS
+Должно вывести, например, /mnt/lfs.
+
+Если пусто, задай вручную:
+
+bash
+Copy
+Edit
+export LFS=/mnt/lfs
+3. Отключи виртуальные файловые системы
+bash
+Copy
+Edit
+mountpoint -q $LFS/dev/shm && umount $LFS/dev/shm
+umount $LFS/dev/pts
+umount $LFS/{sys,proc,run,dev}
+Зачем?
+Чтобы бэкап не содержал “живых” монтированных директорий.
+
+4. Создай архив всего LFS
+bash
+Copy
+Edit
+cd $LFS
+tar -cJpf $HOME/lfs-temp-tools-r12.3-61-systemd.tar.xz .
+Что делает команда?
+Архивирует (и сжимает) всё содержимое твоей LFS-системы в один большой файл в домашней директории root.
+
+Можно выбрать другой путь — просто замени $HOME на нужную тебе папку.
+
+Ожидай: процесс займёт до 10–20 минут (всё зависит от скорости диска и размера системы).
+
+Что делать после бэкапа?
+Если всё прошло успешно — продолжай к главе 8: Building the LFS System.
+
+Перед продолжением обязательно снова смонтируй виртуальные файловые системы и войди в chroot (см. шаги ниже).
+
+Восстановление (restore) из бэкапа
+Это делаешь только если что-то “сломается” на следующих шагах и потребуется “откатиться” назад.
+
+Очень аккуратно, т.к. команды опасные!
+
+1. Убедись, что переменная $LFS задана
+bash
+Copy
+Edit
+echo $LFS
+Если пусто — задаёшь, как раньше.
+
+2. Очисти всё содержимое $LFS
+bash
+Copy
+Edit
+cd $LFS
+rm -rf ./*
+ВНИМАНИЕ: Убедись, что находишься ВНУТРИ $LFS, иначе можно уничтожить всю систему!
+
+3. Распакуй бэкап
+bash
+Copy
+Edit
+tar -xpf $HOME/lfs-temp-tools-r12.3-61-systemd.tar.xz
+Всё вернётся к состоянию на момент архивации.
+
+4. После восстановления — смонтируй виртуальные ФС и войди в chroot:
+bash
+Copy
+Edit
+mount -v --bind /dev $LFS/dev
+mount -vt devpts devpts -o gid=5,mode=0620 $LFS/dev/pts
+mount -vt proc proc $LFS/proc
+mount -vt sysfs sysfs $LFS/sys
+mount -vt tmpfs tmpfs $LFS/run
+# И проверь /dev/shm (см. соответствующий раздел)
+Потом вход в chroot как обычно:
+
+bash
+Copy
+Edit
+chroot "$LFS" /usr/bin/env -i   \
+    HOME=/root                  \
+    TERM="$TERM"                \
+    PS1='(lfs chroot) \u:\w\$ ' \
+    PATH=/usr/bin:/usr/sbin     \
+    MAKEFLAGS="-j$(nproc)"      \
+    TESTSUITEFLAGS="-j$(nproc)" \
+    /bin/bash --login
+РЕЗЮМЕ:
+Очисти временные файлы и каталоги.
+
+Сделай бэкап (ОЧЕНЬ желательно, если боишься что-то потерять!).
+
+Перед продолжением убедись, что перемонтировал виртуальные ФС и снова вошёл в chroot.
+
+После этого — можно начинать строить настоящую LFS-систему!
+
+Если будут вопросы по какому-то конкретному шагу (или неясно, в каком ты окружении) — спрашивай, лучше спросить ещё раз, чем случайно потерять всё!
+Ты на финишной прямой первой части, поздравляю!
+
+
+
+
+
+
+
+
+
+Tools
+
+
+
+можно загрузить архив на Google Диск через терминал — существует несколько удобных способов!
+Вот самые популярные:
+
+1. Использование rclone
+rclone — очень мощная утилита для работы с разными облаками, включая Google Drive.
+Она кроссплатформенная, работает даже без GUI и подходит для больших файлов.
+
+Пошаговая инструкция:
+Установи rclone
+На большинстве Linux:
+
+bash
+Copy
+Edit
+sudo apt install rclone
+или
+
+bash
+Copy
+Edit
+sudo pacman -S rclone
+или скачай готовый бинарник с официального сайта rclone.
+
+Настрой подключение к Google Drive
+Введи в терминале:
+
+bash
+Copy
+Edit
+rclone config
+Создай новое “remote” (например, gdrive), выбери тип drive, следуй инструкции (будет открыт браузер для авторизации).
+
+Загрузить файл на Google Диск:
+Например, чтобы отправить архив в папку LFS на Google Drive:
+
+bash
+Copy
+Edit
+rclone copy /путь/к/архиву/lfs-temp-tools-r12.3-61-systemd.tar.xz gdrive:LFS/
+Если папки LFS нет, она будет создана.
+
+Если нужно отправить в корень диска:
+
+bash
+Copy
+Edit
+rclone copy /путь/к/архиву/lfs-temp-tools-r12.3-61-systemd.tar.xz gdrive:
+Проверить, что файл загрузился:
+
+bash
+Copy
+Edit
+rclone ls gdrive:LFS/
+или посмотри файл на Google Drive.
+
+2. Альтернативы
+gdrive (старый неофициальный клиент, требует меньше настроек, но уже не поддерживается официально).
+
+drive (Go-клиент, только для загрузки/выгрузки, подходит для простых задач).
+
+Google Drive API (можно писать скрипты, но для разовой задачи проще rclone).
+
+Рекомендуется: rclone
+Простая настройка, поддержка больших файлов, кроссплатформенность.
+
+Можно делать синхронизацию папок, удалённое монтирование Google Drive как диск (см. rclone mount), резервное копирование и многое другое.
+
+Пример полностью:
+bash
+Copy
+Edit
+sudo apt install rclone
+rclone config
+# далее — выбирай Google Drive, авторизуйся, дай имя (например, gdrive)
+
+# когда всё готово:
+rclone copy /mnt/lfs/lfs-temp-tools-r12.3-61-systemd.tar.xz gdrive:LFS/
+Если не хочешь настраивать rclone, можно воспользоваться веб-интерфейсом:
+Открой Google Drive через браузер.
+
+Просто перетащи файл мышкой — но это менее удобно для больших файлов и автоматизации.
+
+Резюме:
+Да, через терминал ты легко можешь отправить архив на Google Drive через rclone.
+
+Это просто, удобно и безопасно!
+
+Если нужна помощь с rclone (или хочешь прям команду под свой случай) — напиши, подскажу всё до мелочей!
+
+
+
+
+
+
+
+
+
+Tools
+
+
+
+ChatGPT can make mistake
+
+Кратко: Да, после завершения этого этапа (очистка, бэкап, выход из chroot) ты можешь спокойно перезагружать компьютер, выключать виртуалку, делать рестарт — прогресс никуда не денется!
+
+Поясню подробнее:
+Когда безопасно перезагружаться/выключаться:
+Если ты сделал(а):
+
+Очистку временных файлов (rm -rf /usr/share/{info,man,doc}/*, .la, /tools)
+
+Сохранил(а) бэкап (или просто завершил(а) работу с временными инструментами)
+
+Вышел(шла) из chroot (exit)
+
+Отмонтировал(а) виртуальные файловые системы (umount всех /dev, /proc, /sys, /run, /dev/pts, /dev/shm)
+
+…то LFS-диск готов, его содержимое не меняется до следующего запуска.
+
+Что нужно помнить после перезагрузки:
+Перед продолжением обязательно:
+
+Смонтировать все необходимые разделы (если есть отдельный /mnt/lfs, /mnt/lfs/sources и т.д.).
+
+Смонтировать виртуальные файловые системы (как ты делал(а) ранее):
+
+bash
+Copy
+Edit
+mount -v --bind /dev $LFS/dev
+mount -vt devpts devpts -o gid=5,mode=0620 $LFS/dev/pts
+mount -vt proc proc $LFS/proc
+mount -vt sysfs sysfs $LFS/sys
+mount -vt tmpfs tmpfs $LFS/run
+# и /dev/shm (см. книгу)
+Зайти снова в chroot через ту же длинную команду, что использовал(а) ранее:
+
+bash
+Copy
+Edit
+chroot "$LFS" /usr/bin/env -i   \
+    HOME=/root                  \
+    TERM="$TERM"                \
+    PS1='(lfs chroot) \u:\w\$ ' \
+    PATH=/usr/bin:/usr/sbin     \
+    MAKEFLAGS="-j$(nproc)"      \
+    TESTSUITEFLAGS="-j$(nproc)" \
+    /bin/bash --login
+Твои временные инструменты, настройки, исходники — всё останется в том же виде!
+
+Даже если ничего не бэкапить, но ничего не трогать и не ломать в LFS-разделе — всё будет в порядке после перезапуска.
+
+Если делал(а) бэкап — его можно хранить где угодно (в том числе на Google Drive, как выше), восстановить в случае сбоя.
+
+Советы:
+Лучше всегда выходить из chroot и отмонтировать виртуальные ФС перед перезагрузкой/выключением виртуалки.
+
+После старта снова внимательно проверить, что всё смонтировано, переменная $LFS задана.
+
+Если не уверен(а) — переспроси здесь! Это лучше, чем потерять кучу часов работы.
+
+Резюме:
+После этапа очистки/бэкапа/выхода из chroot можно спокойно делать рестарт сессии, перезагружать компьютер, выключать виртуалку — прогресс не пропадёт!
+
+Если нужна краткая “шпаргалка” по шагам после рестарта для продолжения работы — скажи, пришлю!
+
+Конкретно: что входит в временные инструменты?
+Всё, что ты собирал(-а) на этапе временного toolchain (главы 6 и 7):
+
+Компиляторы: gcc, binutils
+
+Системные библиотеки: glibc
+
+Скриптовые языки: bash, perl, python (базовые сборки)
+
+Утилиты: coreutils, make, grep, sed, gawk, findutils, diffutils, tar, gzip, bzip2, xz, patch, file, texinfo, util-linux и многие другие.
+
+Программы для поддержки локализации: gettext (msgfmt, msgmerge, xgettext)
+
+Сборочные инструменты: m4, autoconf, automake, libtool, bison, flex, pkg-config
+
+Куда они устанавливаются?
+В начале — почти всё устанавливается в отдельную директорию (/tools) и/или “внутрь” твоего будущего LFS ($LFS/usr, $LFS/bin и т.п.) в chroot.
+
+Их единственная задача — быть “строителями” настоящей системы.
+Как только ты соберёшь настоящие финальные версии программ в Главе 8 (и далее) — эти временные версии можно удалять!
+
+Что будет потом?
+В финальной системе:
+
+Все программы будут собраны уже из-под “самой себя” — т.е. glibc, gcc, bash, coreutils и т.д. будут финальные, “чистые”, без связи с инструментами-хоста или временными бинарниками.
+
+Временные инструменты /tools больше не нужны (в этом шаге ты их как раз и удаляешь!).
+
+Зачем так сложно?
+Чтобы система получилась полностью независимой от окружения, на котором ты её собираешь.
+
+Чтобы не было “протечек” библиотек, путей, скриптов и багов из старой системы-хоста.
+
+Чтобы твой LFS работал одинаково на любом хосте, и был настоящим, чистым Linux.
+
+РЕЗЮМЕ
+Всё, что ты собирал(-а) в главах 6 и 7 — это и есть временные инструменты (temporary tools).
+
+Они используются только для сборки настоящей системы.
+
+После сборки основной системы — их можно смело удалять.
+
+Если хочется увидеть список всех пакетов временных инструментов или подробную схему “какой этап для чего” — пиши, пришлю!
+Ты очень хорошо разбираешься, вопросы отличные!
+
+
+
+
+
+
+
+
+Архивация такой большой директории (tar -cJpf ...) может выглядеть как будто “застряла” — особенно если ты не видишь никакого вывода, а диск работает медленно.
+
+Почему так происходит?
+tar по умолчанию ничего не выводит на экран во время архивации, если не добавить опцию -v.
+
+Если архив большой (а твой LFS — это, скорее всего, 2–3+ гигабайта с тысячами файлов), процесс может идти 10, 20, 30 минут и дольше — особенно на виртуалке или медленном диске.
+
+Чем больше файлов, тем дольше идёт обработка и сжатие (особенно с -J/xz).
+
+Как понять, что процесс живой и не завис?
+Проверь загрузку процессора и диска:
+
+Открой новый терминал (или через Ctrl+Alt+F2 — если на виртуалке).
+
+Выполни:
+
+bash
+Copy
+Edit
+top
+— ищи процесс tar и xz. Если они есть и используют проц/диск — значит архивирование идёт.
+
+Можно посмотреть, увеличивается ли размер файла архива:
+
+Открой второй терминал.
+
+Выполни:
+
+bash
+Copy
+Edit
+ls -lh $HOME/lfs-temp-tools-r12.3-61-systemd.tar.xz
+— Если размер файла постепенно увеличивается — процесс живой.
+
+Можно добавить опцию -v (verbose) — тогда tar будет показывать, что он архивирует (но для этого нужно запускать сначала):
+
+bash
+Copy
+Edit
+tar -cJpvf $HOME/lfs-temp-tools-r12.3-61-systemd.tar.xz .
+— но ты уже начал, так что просто жди.
+
+Сколько ждать?
+Если у тебя нет SSD, а только HDD, и особенно если ты на виртуалке — ждать 15–30 минут и больше вполне нормально для такого архива.
+
+Если вдруг архивирование идёт несколько часов без малейшего движения — тогда уже стоит проверять состояние.
+
+Что делать, если нужно прервать?
+Лучше не прерывать — если только ты не уверен, что что-то пошло не так.
+
+Если ты уверен, что процесс “повис” (и нет активности по CPU и диску) — можно остановить с помощью Ctrl+C, но частичный архив использовать нельзя!
+
+ИТОГ:
+Да, это нормально!
+
+Просто жди — архивирование больших каталогов всегда идёт “без вывода” и может занять много времени.
+
+Проверяй во втором терминале, что tar/xz работают и файл архива растёт.
+
+Если всё равно волнуешься — скинь вывод команды top или ls -lh $HOME/lfs-temp-tools-r12.3-61-systemd.tar.xz, я помогу понять, всё ли ок!
+Скоро архив будет готов, просто нужно немного терпения.
+
+ChatGPT said:
+Да, при создании такого большого архива сжатие (tar -cJpf ...) — это нормально, что компьютер греется и слышно, как работает вентилятор.
+Это связано с тем, что процесс сжатия (xz) и архивации сильно грузит процессор, особенно если включено многопоточность (xz по умолчанию использует все ядра).
+
+Почему так?
+xz (а именно опция -J в tar) использует очень сложное сжатие (LZMA2), чтобы сделать архив поменьше. Это требует много CPU.
+
+Чем больше файлов, тем больше процессорная нагрузка — даже если у тебя SSD, всё равно именно CPU “запаривается”.
+
+Виртуалка часто работает в “нагруженном” режиме, что тоже увеличивает температуру.
+
+В зависимости от настроек, может использоваться 100% CPU всех ядер.
+
+Это опасно?
+Нет, если компьютер или сервер исправен и охлаждение работает нормально.
+
+Все современные CPU и ноутбуки имеют защиту — если температура слишком высока, они замедляются или выключают ядра (throttling).
+
+Если слышишь, что вентилятор включился — это просто защита, чтобы не перегреться.
+
+Что можно сделать, чтобы снизить нагрев (если волнуешься):
+Уменьшить число потоков для xz (если перезапускать)
+
+Можно сделать так:
+
+bash
+Copy
+Edit
+XZ_DEFAULTS="-T1" tar -cJpf ...
+Это ограничит xz одним ядром (нагрев будет меньше, но и архивироваться будет дольше).
+
+Поставить ноутбук/компьютер на хорошее охлаждение
+
+Используй охлаждающую подставку, приоткрой крышку (для ноутбуков).
+
+Если очень жарко — подожди, архивируй ночью, когда температура ниже.
+
+Можно ли просто ждать?
+Да, в 99% случаев никаких проблем не будет.
+
+Даже если процессор будет загружен до 100% несколько десятков минут — это не опасно для нормального современного компа.
+
+Главное, чтобы вентиляция работала (если ноутбук — не был забит пылью).
+
+Резюме
+Греется — это нормально!
+
+Сжатие сильно грузит CPU, и температура растёт.
+
+Если компьютер не отключается, не вырубается — просто подожди, всё будет ок.
+
+Если уж очень волнуешься — после завершения можешь дать компу остыть, или в будущем ограничить потоки для сжатия.
+
+Если хочешь — подскажу команду, как архивировать с меньшей нагрузкой, или проверить температуру CPU прямо из терминала!
+Пиши, если что-то волнует — всё объясню и помогу!
+
+Перезагружать компьютер или выключать виртуалку — прогресс сохранён.
+
+Снова монтировать виртуальные файловые системы и возвращаться в chroot для продолжения сборки (глава 8, построение финальной системы):
+
+bash
+Copy
+Edit
+# Смонтируй виртуальные файловые системы:
+mount -v --bind /dev $LFS/dev
+mount -vt devpts devpts -o gid=5,mode=0620 $LFS/dev/pts
+mount -vt proc proc $LFS/proc
+mount -vt sysfs sysfs $LFS/sys
+mount -vt tmpfs tmpfs $LFS/run
+# /dev/shm — по инструкции (смотри в книге, если нужен отдельный шаг)
+
+# Войти в chroot:
+chroot "$LFS" /usr/bin/env -i   \
+    HOME=/root                  \
+    TERM="$TERM"                \
+    PS1='(lfs chroot) \u:\w\$ ' \
+    PATH=/usr/bin:/usr/sbin     \
+    MAKEFLAGS="-j$(nproc)"      \
+    TESTSUITEFLAGS="-j$(nproc)" \
+    /bin/bash --login
+4. Если архив не нужен, можно ничего не делать
+(этот шаг опциональный — архив нужен только для страховки, если что-то сломается и захочется быстро “откатить” назад).
+
+5. Если дальше собираешь LFS — переходи к следующей главе книги!
+Резюме:
+Проверить размер архива.
+
+При желании скопировать его в безопасное место.
+
+Дальше монтируй виртуальные ФС, входи в chroot и продолжай собирать LFS!
+
+Если сомневаешься, всё ли сделано правильно — покажи вывод ls, помогу убедиться!
+Если нужны подробные шаги по возврату в chroot после перезагрузки — скажи, пришлю “шпаргалку”.
+
+Ты двигаешься идеально по книге, так держать!
+
+
+
+
+
+
+
+
+
+Tools
+
+
+
+ChatGPT can make mistak
+
+
+
+
 
 
 
