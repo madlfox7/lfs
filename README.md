@@ -9510,7 +9510,7 @@ Edit
 
 
 
-
+https://dev.to/akshay_khoje/systemd-vs-sysvinit-initializing-the-system-5h71
 
 
 Tools
