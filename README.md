@@ -1,4 +1,5 @@
 # lfs
+https://ravesli.com/linux-init-systems/
 
 VirtualBox, minimalistic lnux, iso downlaod, setup, partitioning, ubuntu/debian, arch..
 
